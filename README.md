@@ -25,8 +25,12 @@ Use a labeled `customers.csv` with `plan`, `seats` and `churn` columns.
 ```python
 from spavik import Spavik
 
+# Read your API key and API URL from the environment.
 with Spavik() as client:
+    # Train from past customers: "churn" is the value to predict.
     model = client.train("customers.csv", target="churn")
+
+    # Predict churn for a new customer. This call consumes credits.
     result = model.predict({"plan": "pro", "seats": 12})
     print(result.lignes)
 ```
