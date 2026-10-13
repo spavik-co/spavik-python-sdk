@@ -4,6 +4,16 @@ Open pull requests against `dev`. Describe the problem, the public behavior that
 changes and how you verified it. Use synthetic data; never include API keys or
 customer datasets. Security reports go through [SECURITY.md](SECURITY.md).
 
+## Install from source
+
+Requires Python 3.9 or newer. Until the first PyPI release:
+
+```sh
+python -m pip install "git+https://github.com/spavik-co/spavik-python-sdk.git@dev"
+```
+
+For local development, clone `dev` and use the checks below.
+
 ## Local checks
 
 Run from the repository root:
