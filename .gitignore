@@ -1,0 +1,31 @@
+# Python environments, caches and build artifacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local assistant instructions and workspace settings
+CLAUDE.md
+AGENTS.md
+.claude/
+.codex/
+.agents/
+.idea/
+.vscode/
+.DS_Store
