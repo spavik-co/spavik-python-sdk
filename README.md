@@ -9,51 +9,63 @@ Add predictive capabilities to your application without building an ML stack.
 
 ## Install
 
-Development preview: not yet published to PyPI. For now,
-[install from source](CONTRIBUTING.md#install-from-source).
-After the first release:
+Requires Python 3.9 or later.
+
+Development preview: not yet published to PyPI. Install from source:
+
+```sh
+python -m pip install "git+https://github.com/spavik-co/spavik-python-sdk.git@dev"
+```
+
+## Get your API key
+
+Create a free account at [spavik.co](https://spavik.co) and generate your API key from the dashboard.
+
+New accounts include **1,000 free predictions**. No credit card required.
 
 ```bash
-pip install spavik
+export SPAVIK_API_KEY="sk-spv-api-..."
 ```
 
 ## Quickstart
 
-Set `SPAVIK_API_KEY` with your API key.
-Use a labeled `customers.csv` with `plan`, `seats` and `churn` columns.
+Download [churn.csv](examples/data/churn.csv) and save it in your application's
+working directory. It contains synthetic customer records with `plan`, `seats`,
+`tickets_90d` and the known outcome `churn`. It demonstrates the API, not model quality.
+
+Save this as `quickstart.py` beside the CSV:
 
 ```python
 from spavik import Spavik
 
 # Read your API key from SPAVIK_API_KEY.
 with Spavik() as client:
-    # Train from past customers: "churn" is the value to predict.
-    model = client.train("customers.csv", target="churn")
+    # Train on historical customers; "churn" is the value to predict. Training is free.
+    model = client.train("churn.csv", target="churn")
 
-    # Predict churn for a new customer. This call consumes credits.
-    result = model.predict({"plan": "pro", "seats": 12})
+    # Predict for a new customer using the same input columns. This consumes credits.
+    result = model.predict({"plan": "pro", "seats": 12, "tickets_90d": 2})
     print(result.lignes)
 ```
 
-The SDK uses `https://api.spavik.co` by default. To use the test environment,
-set the optional `SPAVIK_BASE_URL` to `https://test-api.spavik.co`.
+```sh
+python quickstart.py
+```
+
+`result.lignes` contains the predictions returned by the API. Reuse the trained
+model for subsequent predictions; you do not need to train for every request.
 
 ## What you can do
 
-- Classification
-- Regression
-- Forecasting
-- Dataset validation
-- Model performance monitoring
-
-## Why Spavik
-
-Prediction used to require an ML team.
-Now it’s a developer primitive.
+- Classification and regression
+- Time-series forecasting
+- Dataset validation and evaluation
+- Model performance monitoring and outcome feedback
 
 ## Documentation
 
-[docs.spavik.co](https://docs.spavik.co)
+See [docs.spavik.co](https://docs.spavik.co) for guides and the API reference.
+For development and contributions, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
