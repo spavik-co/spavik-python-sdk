@@ -4,7 +4,7 @@ from __future__ import annotations
 
 API_VERSION = '1.0.0'
 
-CONTRAT_SOURCE = 'https://spavik-gateway-test-bnp1bedb.ew.gateway.dev'
+CONTRAT_SOURCE = 'https://test-api.spavik.co'
 
 OPERATIONS = {'train': {'method': 'POST',
            'path': '/v1/models',

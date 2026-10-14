@@ -28,10 +28,8 @@ _LOG = logging.getLogger("spavik")
 
 REPRISES_MAX = 3
 STATUTS_REPRENABLES = frozenset({429, 500, 502, 503, 504})
-# Environnement de test. A remplacer par l'URL de production avant publication :
-# livrer un client dont le defaut pointe sur un banc d'essai est un piege.
-BASE_URL_TEST = "https://spavik-gateway-test-bnp1bedb.ew.gateway.dev"
-BASE_URL_DEFAUT = os.environ.get("SPAVIK_BASE_URL", BASE_URL_TEST)
+BASE_URL_TEST = "https://test-api.spavik.co"
+BASE_URL_DEFAUT = os.environ.get("SPAVIK_BASE_URL") or "https://api.spavik.co"
 
 
 def configurer_journalisation() -> None:

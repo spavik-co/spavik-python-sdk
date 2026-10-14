@@ -35,9 +35,8 @@ with Spavik() as client:
     print(result.lignes)
 ```
 
-This development preview defaults to the test API at
-`https://spavik-gateway-test-bnp1bedb.ew.gateway.dev`.
-`SPAVIK_BASE_URL` is optional; set it only to use another API environment.
+The SDK uses `https://api.spavik.co` by default. To use the test environment,
+set the optional `SPAVIK_BASE_URL` to `https://test-api.spavik.co`.
 
 ## What you can do
 
