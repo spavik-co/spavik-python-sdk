@@ -331,12 +331,13 @@ class Spavik(_Base):
         api_key: Optional[str] = None,
         *,
         base_url: Optional[str] = None,
+        user_agent: Optional[str] = None,
         timeout: float = 30.0,
         max_retries: int = 3,
         backoff: Optional[Any] = None,
         client: Optional[httpx.Client] = None,
     ) -> None:
-        super().__init__(api_key, base_url, timeout, max_retries, backoff)
+        super().__init__(api_key, base_url, timeout, max_retries, backoff, user_agent)
         self._http = client or httpx.Client(timeout=timeout)
         self._http_fourni = client is not None
         self._moteur_defaut: Optional[str] = None
@@ -360,7 +361,7 @@ class Spavik(_Base):
             try:
                 reponse = self._http.request(
                     requete.methode, self._url(requete.chemin),
-                    headers=requete.entetes(self.cle_api),
+                    headers=requete.entetes(self.cle_api, self.user_agent),
                     json=requete.corps, params=requete.parametres, timeout=requete.delai,
                 )
             except httpx.HTTPError as exc:
@@ -497,12 +498,13 @@ class AsyncSpavik(_Base):
         api_key: Optional[str] = None,
         *,
         base_url: Optional[str] = None,
+        user_agent: Optional[str] = None,
         timeout: float = 30.0,
         max_retries: int = 3,
         backoff: Optional[Any] = None,
         client: Optional[httpx.AsyncClient] = None,
     ) -> None:
-        super().__init__(api_key, base_url, timeout, max_retries, backoff)
+        super().__init__(api_key, base_url, timeout, max_retries, backoff, user_agent)
         self._http = client or httpx.AsyncClient(timeout=timeout)
         self._http_fourni = client is not None
         self._moteur_defaut: Optional[str] = None
@@ -526,7 +528,7 @@ class AsyncSpavik(_Base):
             try:
                 reponse = await self._http.request(
                     requete.methode, self._url(requete.chemin),
-                    headers=requete.entetes(self.cle_api),
+                    headers=requete.entetes(self.cle_api, self.user_agent),
                     json=requete.corps, params=requete.parametres, timeout=requete.delai,
                 )
             except httpx.HTTPError as exc:

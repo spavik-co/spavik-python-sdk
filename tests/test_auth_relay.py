@@ -23,7 +23,7 @@ def test_credentials_are_decided_by_api(monkeypatch, key, status):
             with pytest.raises(SpavikAuthError):
                 client.usage()
     assert len(calls) == 1
-    assert calls[0].headers.get("X-API-Key") == (key if key else None)
+    assert calls[0].headers.get("X-Spavik-Api-Key") == (key if key else None)
     assert "Authorization" not in calls[0].headers
 
 
@@ -39,7 +39,7 @@ async def test_async_credentials_reach_api(monkeypatch, key):
         with pytest.raises(SpavikAuthError):
             await client.usage()
     assert len(calls) == 1
-    assert calls[0].headers.get("X-API-Key") == (key if key else None)
+    assert calls[0].headers.get("X-Spavik-Api-Key") == (key if key else None)
     assert "Authorization" not in calls[0].headers
 
 

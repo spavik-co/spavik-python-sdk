@@ -62,14 +62,18 @@ class Requete:
     idempotence: Optional[str] = None
     contexte: str = ""
 
-    def entetes(self, cle_api: str) -> Dict[str, str]:
-        # Les cles API passent exclusivement en X-API-Key ; Bearer est reserve aux JWT.
+    def entetes(self, cle_api: str, user_agent: Optional[str] = None) -> Dict[str, str]:
+        from . import __version__
+
+        # Les cles API passent exclusivement en X-Spavik-Api-Key ; Bearer est reserve aux JWT.
         e = {
             "Accept": "application/json",
-            "User-Agent": _agent(),
+            "User-Agent": user_agent or _agent(),
+            "X-Spavik-Client-Name": "spavik-sdk-python",
+            "X-Spavik-Client-Version": __version__,
         }
         if cle_api:
-            e["X-API-Key"] = cle_api
+            e["X-Spavik-Api-Key"] = cle_api
         if self.corps is not None:
             e["Content-Type"] = "application/json"
         if self.idempotence:
@@ -183,6 +187,7 @@ class _Base:
         delai_defaut: float,
         max_retries: int = REPRISES_MAX,
         backoff: Any = None,
+        user_agent: Optional[str] = None,
     ) -> None:
         # None lit la configuration ; une chaine vide reste explicitement vide.
         self.cle_api = (os.environ.get("SPAVIK_API_KEY") or "") if cle_api is None else cle_api
@@ -192,6 +197,7 @@ class _Base:
         # n'en faire aucune, d'autres attendre autrement.
         self.max_retries = max_retries
         self.backoff = backoff or attente
+        self.user_agent = user_agent
         configurer_journalisation()
 
     def _url(self, chemin: str) -> str:
