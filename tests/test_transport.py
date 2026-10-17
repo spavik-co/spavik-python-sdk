@@ -16,7 +16,7 @@ from spavik import (
 
 def _erreur(statut, code, **extra):
     corps = {"status": "error", "message": code, "messageDetail": "detail", **extra}
-    return httpx.Response(statut, json=corps, headers={"x-request-id": "req_abc123"})
+    return httpx.Response(statut, json=corps, headers={"x-spavik-request-id": "req_abc123", "Retry-After": "0"})
 
 
 def test_le_request_id_remonte_dans_l_exception(spavik, api, churn):
@@ -43,7 +43,7 @@ def test_reponse_html_ne_leve_pas_une_erreur_de_decodage(spavik, api, churn):
     modele = spavik.train(churn, target="churn")
     api.repondra("/v1/models/mdl_test0001/predict", httpx.Response(
         404, text="<!DOCTYPE html><html><body><pre>Cannot POST</pre></body></html>",
-        headers={"content-type": "text/html; charset=utf-8", "x-request-id": "req_html"}))
+        headers={"content-type": "text/html; charset=utf-8", "x-spavik-request-id": "req_html"}))
     with pytest.raises(SpavikTransportError) as exc:
         modele.predict([{"plan": "pro"}])
     assert "non-JSON" in str(exc.value)
@@ -101,7 +101,7 @@ def test_une_prediction_rejouee_ne_debite_pas_deux_fois(spavik, api, churn):
     depart = api.solde
     api.repondra(f"/v1/models/{modele.id}/predict", _erreur(503, "ENGINE_UNAVAILABLE"))
     resultat = modele.predict([{"plan": "pro"}] * 4)
-    assert resultat.cout == 4
+    assert resultat.cout is None
     assert depart - api.solde == 4
 
 
@@ -145,7 +145,7 @@ def test_erreur_de_la_passerelle_nest_pas_prise_pour_un_code(spavik, api, churn)
     """
     api.repondra("/v1/models", httpx.Response(
         404, json={"code": 404, "message": "The current request is not defined by this API."},
-        headers={"x-request-id": "req_gw"}))
+        headers={"x-spavik-request-id": "req_gw"}))
     with pytest.raises(SpavikNotFound) as exc:
         spavik.train(churn, target="churn")
     assert exc.value.code is None

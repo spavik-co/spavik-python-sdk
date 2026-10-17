@@ -122,13 +122,3 @@ def verites(lignes: Lignes) -> None:
             "prediction they relate to. Provide 'request_id', that of the original "
             "prediction, or 'features', the full row."
         )
-
-
-def cout_prediction(lignes: Lignes) -> int:
-    """Une ligne scoree, un credit."""
-    return len(lignes)
-
-
-def cout_prevision(horizon: int) -> int:
-    """One credit per requested horizon step, with all series included."""
-    return horizon

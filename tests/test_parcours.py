@@ -14,7 +14,7 @@ def test_boucle_complete(spavik, api, churn):
 
     depart = api.solde
     prediction = modele.predict([{"plan": "pro", "seats": 12, "tickets_90d": 3}])
-    assert prediction.cout == 1
+    assert prediction.cout is None
     assert prediction.solde == depart - 1
     assert len(prediction.lignes) == 1
     assert prediction.request_id
@@ -55,7 +55,7 @@ def test_prevision_et_cout(spavik, api):
     serie = [{"date": f"2026-07-{i+1:02d}", "ventes": 100 + i} for i in range(28)]
     depart = api.solde
     resultat = spavik.forecast(serie, target="ventes", horizon=7)
-    assert resultat.cout == 7
+    assert resultat.cout is None
     assert len(resultat.points) == 7
     assert depart - api.solde == 7
 
@@ -65,7 +65,7 @@ def test_prevision_multi_series(spavik, api):
     api.solde = 7
     assert api.appels == []
     result = spavik.forecast(serie, target="ventes", horizon=7, item_id="boutique")
-    assert result.cout == 7
+    assert result.cout is None
     assert api.solde == 0
 
 
@@ -75,7 +75,7 @@ async def test_prevision_multi_series_asynchrone(aspavik, api):
     api.solde = 7
     assert api.appels == []
     result = await aspavik.forecast(serie, target="ventes", horizon=7, item_id="boutique")
-    assert result.cout == 7
+    assert result.cout is None
     assert api.solde == 0
 
 
@@ -85,7 +85,7 @@ async def test_asynchrone_donne_le_meme_resultat(aspavik, api, churn):
     assert modele.id.startswith("mdl_")
 
     prediction = await modele.predict([{"plan": "pro"}])
-    assert prediction.cout == 1
+    assert prediction.cout is None
     assert len(prediction.lignes) == 1
 
     await modele.submit_outcomes([{"request_id": "req_1", "actual": 1}])
@@ -108,41 +108,42 @@ async def test_asynchrone_refuse_pareil(aspavik, api, churn):
     await aspavik.aclose()
 
 
-def test_le_moteur_par_defaut_est_resolu_puis_garde(spavik, api, churn):
-    """L'API exige `engine` ; le client va le chercher, une fois pour toutes."""
+def test_default_family_is_selected_by_api(spavik, api, churn):
+    """The API selects defaults; the client does not resolve or cache them."""
     spavik.train(churn, target="churn")
-    assert api.compte("/v1/engines") == 1
+    assert api.compte("/v1/engines") == 0
     envoye = [a for a in api.appels if a.url.path == "/v1/models" and a.method == "POST"][0]
     import json as _json
-    assert _json.loads(envoye.content)["engine"] == "tabicl-v2"
+    assert "engine_family" not in _json.loads(envoye.content)
+    assert "engine" not in _json.loads(envoye.content)
 
     spavik.train(churn, target="churn")
-    assert api.compte("/v1/engines") == 1, "le catalogue ne se relit pas a chaque entrainement"
+    assert api.compte("/v1/engines") == 0, "le catalogue ne se relit pas a chaque entrainement"
 
 
 def test_un_moteur_explicite_court_circuite_la_resolution(spavik, api, churn):
-    spavik.train(churn, target="churn", engine="tabicl-v2")
+    spavik.train(churn, target="churn", engine_family="presage")
     assert api.compte("/v1/engines") == 0
 
 
 def test_engines_rend_le_catalogue_tel_que_l_api_le_decrit(spavik, api):
     moteurs = spavik.engines()
-    assert [m["id"] for m in moteurs] == ["tabicl-v2"]
+    assert [m["id"] for m in moteurs] == ["presage-2"]
     assert moteurs[0]["status"] == "default"
 
 
-def test_le_prix_d_une_prediction_est_celui_du_moteur(spavik, api, churn):
-    """Le catalogue publie `credits` par moteur : le cout le suit."""
+def test_prediction_cost_is_not_invented_from_the_catalogue(spavik, api, churn):
+    """A training engine tariff cannot establish the actual debit."""
     import httpx
     api.repondra("/v1/engines", httpx.Response(200, json=[
-        {"id": "tabicl-v2", "status": "default", "credits": 1},
+        {"id": "presage-2", "status": "default", "credits": 1},
         {"id": "big-v1", "status": "preview", "credits": 3}]))
     model = spavik.train(churn, target="churn")
     api.modeles[model.id]["engine"] = "big-v1"   # servi par un moteur a trois credits
     model = spavik.model(model.id)
     assert model.engine == "big-v1"
-    assert model.predict([{"plan": "pro"}] * 4).cout == 12
-    assert api.compte("/v1/engines") == 1, "le catalogue se lit une fois"
+    assert model.predict([{"plan": "pro"}] * 4).cout is None
+    assert api.compte("/v1/engines") == 0, "le catalogue se lit une fois"
 
 
 def test_usage_rend_le_solde_et_la_periode(spavik, api, churn):
@@ -250,14 +251,14 @@ def test_le_modele_dit_les_colonnes_qu_il_attend(spavik, api, churn):
 
 async def test_evaluer_asynchrone(aspavik, api, churn):
     try:
-        rapport = await aspavik.evaluate(churn, target="churn", engine="tabicl-v2")
+        rapport = await aspavik.evaluate(churn, target="churn", engine_family="presage")
         assert rapport["trial"]["verdict"]["level"] == "usable"
         requete = api.appels[-1]
         assert requete.method == "POST"
         assert requete.url.path == "/v1/datasets/evaluate"
         import json
         assert json.loads(requete.content) == {
-            "data": churn, "target": "churn", "engine": "tabicl-v2",
+            "data": churn, "target": "churn", "engine_family": "presage",
         }
         assert api.solde == 100 and not api.modeles
     finally:

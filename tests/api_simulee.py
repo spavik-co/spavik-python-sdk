@@ -103,25 +103,24 @@ class ApiSimulee:
                              "verdict": {"level": "usable",
                                          "message": "The engine beats the naive forecast on this series."}}})
 
+        if chemin == "/v1/engine-families":
+            return self._json(200, [{"id": "presage", "label": "Presage", "is_default": True}])
+
         if chemin == "/v1/engines":
-            return self._json(200, [{"id": "tabicl-v2", "label": "TabICL v2",
-                                     "status": "default", "credits": 1, "min_plan": None,
+            return self._json(200, [{"id": "presage-2", "label": "Presage 2",
+                                     "status": "default", "family": "presage", "version": "2",
+                                     "tasks": ["classification", "regression", "forecast"], "rank": 1, "credits": 1, "min_plan": None,
                                      "retires_at": None}])
 
         if chemin == "/v1/models" and requete.method == "POST":
-            if not corps.get("engine"):
-                # L'API refuse un entrainement sans moteur, meme si le contrat
-                # ne le compte pas parmi les champs requis.
-                return self._json(422, {"status": "error", "message": "ENGINE_REQUIRED",
-                                        "messageDetail": "Declare the engine to train with (engine)."})
-            if corps["engine"] != "tabicl-v2":
-                # Un moteur hors catalogue : l'API le refuse par son code.
-                return self._json(422, {"status": "error", "message": "ENGINE_UNKNOWN",
-                                        "messageDetail": f"Unknown engine '{corps['engine']}'."})
+            assert "engine" not in corps, "Legacy engine field sent"
+            family = corps.get("engine_family", "presage")
+            if family not in {"presage", "flair", "prophecy"}:
+                return self._json(422, {"message": "VALIDATION_ERROR", "messageDetail": "Unknown engine family."})
             self._compteur += 1
             mid = f"mdl_test{self._compteur:04d}"
             self.modeles[mid] = {"id": mid, "name": corps.get("name") or "modele",
-                                 "latest_version": 1, "task": "classification"}
+                                 "latest_version": 1, "task": "classification", "engine_family": family, "engine": family + "-2"}
             return self._json(201, {"model": self.modeles[mid],
                                     "version": {"version": 1, "id": "ver_1"},
                                     "validation": {"row_count": len(corps.get("data") or [])},
@@ -209,7 +208,7 @@ class ApiSimulee:
             if requete.method == "DELETE":
                 # Suppression definitive : artefacts purges. Hors perimetre client.
                 del self.modeles[mid]
-                return httpx.Response(204, headers={"x-request-id": "req_simule204"})
+                return httpx.Response(204, headers={"x-spavik-request-id": "req_simule204"})
             # Archive : sort du quota et du catalogue, artefacts conserves ;
             # restore : reprend sa place.
             self.modeles[mid]["status"] = "archived" if chemin.endswith("/archive") else "ready"
@@ -230,9 +229,9 @@ class ApiSimulee:
         # Route inconnue : la vraie API rend la page d'erreur du serveur, en HTML.
         return httpx.Response(
             404, text="<!DOCTYPE html>\n<html><body><pre>Cannot POST " + chemin + "</pre></body></html>",
-            headers={"content-type": "text/html; charset=utf-8", "x-request-id": "req_html"})
+            headers={"content-type": "text/html; charset=utf-8", "x-spavik-request-id": "req_html"})
 
     @staticmethod
     def _json(statut: int, corps: Any, entetes: Optional[Dict[str, str]] = None) -> httpx.Response:
         return httpx.Response(statut, json=corps,
-                              headers={"x-request-id": f"req_simule{statut}", **(entetes or {})})
+                              headers={"x-spavik-request-id": f"req_simule{statut}", **(entetes or {})})

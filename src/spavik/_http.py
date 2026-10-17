@@ -5,7 +5,7 @@ seule la fonction qui envoie change. Trois choses s'y jouent, et elles sont
 identiques dans les trois composants du depot.
 
 1. Les reprises ne portent que sur ce qui est reprenable : 429, 5xx, et les
-   pannes reseau. Jamais un 4xx, qui ne changera pas d'avis.
+   pannes reseau. REQUEST_IN_PROGRESS (409) is retryable with the original key.
 2. La cle d'idempotence est tiree une fois par appel logique et rejouee telle
    quelle a chaque tentative. C'est elle qui evite un second debit.
 3. Une reponse non JSON leve une erreur nommee, pas une erreur de decodage.
@@ -27,7 +27,6 @@ from . import errors as _err
 _LOG = logging.getLogger("spavik")
 
 REPRISES_MAX = 3
-STATUTS_REPRENABLES = frozenset({429, 500, 502, 503, 504})
 BASE_URL_TEST = "https://test-api.spavik.co"
 BASE_URL_DEFAUT = os.environ.get("SPAVIK_BASE_URL") or "https://api.spavik.co"
 
@@ -92,11 +91,8 @@ def nouvelle_cle_idempotence() -> str:
 
 
 def _request_id(entetes: Mapping[str, str]) -> Optional[str]:
-    for nom in ("x-request-id", "X-Request-Id", "X-Request-ID"):
-        if nom in entetes:
-            return entetes[nom]
     minuscules = {k.lower(): v for k, v in entetes.items()}
-    return minuscules.get("x-request-id")
+    return minuscules.get("x-spavik-request-id") or minuscules.get("x-request-id")
 
 
 # Le solde voyage aussi en en-tete : chaque prediction et chaque prevision
@@ -140,23 +136,17 @@ def interpreter(
         return None, _err.depuis_reponse(statut, corps, rid, contexte=requete.contexte)
 
     if isinstance(corps, dict):
-        corps.setdefault("_request_id", rid)
+        corps["_request_id"] = rid
+        if entetes.get("x-spavik-model-version"):
+            corps["_engine_version"] = entetes["x-spavik-model-version"]
         solde = _solde_entete(entetes)
         if solde is not None:
             corps.setdefault("_predictions_remaining", solde)
     return corps, None
 
 
-def reprenable(statut: Optional[int], tentative: int, maximum: int = REPRISES_MAX) -> bool:
-    if tentative >= maximum:
-        return False
-    if statut is None:  # panne reseau
-        return True
-    return statut in STATUTS_REPRENABLES
-
-
 def attente(tentative: int) -> float:
-    """Exponentielle avec bruit. L'API n'expose pas de `Retry-After` a ce jour."""
+    """Exponentielle avec bruit. Used only when the API supplies no retry delay."""
     return min(8.0, 0.5 * (2 ** (tentative - 1))) * (0.75 + random.random() * 0.5)
 
 

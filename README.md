@@ -9,7 +9,7 @@ Add predictive capabilities to your application without building an ML stack.
 
 ## Install
 
-Requires Python 3.9 or later.
+Requires Python 3.11 or later.
 
 Development preview: not yet published to PyPI. Install from source:
 

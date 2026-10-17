@@ -39,6 +39,7 @@ class SpavikError(Exception):
         self.status = status
         self.request_id = request_id
         self.payload = dict(payload or {})
+        self.idempotency_key: Optional[str] = None
 
     def __str__(self) -> str:
         base = super().__str__()
@@ -94,7 +95,7 @@ class SpavikConflict(SpavikError):
 
 
 class SpavikRateLimited(SpavikError):
-    """Trop d'appels. L'API n'expose pas de `Retry-After` a ce jour."""
+    """Rate limit reached; the transport respects Retry-After."""
 
 
 class SpavikUnavailable(SpavikError):

@@ -18,8 +18,9 @@ from typing import Any, AsyncIterator, Dict, Iterator, List, Mapping, Optional
 import httpx
 
 from . import _data, _ops
+from ._retry import retry_allowed, retry_delay
 from . import errors as _err
-from ._http import Requete, _Base, attente, interpreter, reprenable, tracer
+from ._http import Requete, _Base, interpreter, tracer
 
 
 # --------------------------------------------------------------------------
@@ -31,9 +32,19 @@ class Resultat:
     """Ce que rend un appel : les donnees brutes, et ce qui aide a s'y retrouver."""
 
     donnees: Dict[str, Any] = field(default_factory=dict)
-    cout: int = 0
+    cout: Optional[int] = 0
     solde: Optional[int] = None
     request_id: Optional[str] = None
+
+    @property
+    def training_calibration(self) -> Optional[Dict[str, Any]]:
+        """Initial test-set diagnostic returned by the performance API."""
+        return self.donnees.get("training_calibration")
+
+    @property
+    def engine(self) -> Optional[str]:
+        """Exact serving engine, distinct from the model data version."""
+        return self.donnees.get("_engine_version") or self.donnees.get("engine")
 
     def __getitem__(self, cle: str) -> Any:
         return self.donnees[cle]
@@ -102,7 +113,7 @@ def _solde(brut: Mapping[str, Any]) -> Optional[int]:
     return valeur if isinstance(valeur, int) else None
 
 
-def _resultat(brut: Optional[Dict[str, Any]], cout: int, classe: type = Resultat) -> Any:
+def _resultat(brut: Optional[Dict[str, Any]], cout: Optional[int], classe: type = Resultat) -> Any:
     brut = brut or {}
     return classe(donnees=brut, cout=cout, solde=_solde(brut),
                   request_id=brut.get("_request_id"))
@@ -119,35 +130,15 @@ def _page(brut: Optional[Dict[str, Any]], limit: int, offset: int):
     return lot, (None if fini else suivant)
 
 
-def _prix_du_moteur(entrees: Any, moteur: Optional[str]) -> int:
-    """Les credits que coute une prediction sur ce moteur, 1 si le catalogue
-    ne le dit pas. Le prix est publie par /v1/engines (`credits`)."""
-    if not moteur or not isinstance(entrees, list):
-        return 1
-    for entree in entrees:
-        if isinstance(entree, Mapping) and entree.get("id") == moteur:
-            credits = entree.get("credits")
-            return credits if isinstance(credits, int) and credits > 0 else 1
-    return 1
-
-
-def _moteur_par_defaut(entrees: Any) -> Optional[str]:
-    """Le moteur marque `default`, sinon le premier de la liste."""
-    if not isinstance(entrees, list) or not entrees:
-        return None
-    for entree in entrees:
-        if isinstance(entree, Mapping) and entree.get("status") == "default":
-            return entree.get("id")
-    premier = entrees[0]
-    return premier.get("id") if isinstance(premier, Mapping) else None
-
-
 def _refresh_absorbe(exc: _err.SpavikError) -> bool:
-    """Rien a integrer, integration en cours, stockage absent : etats normaux."""
-    if isinstance(exc, _err.SpavikUnavailable):
-        return True
-    return isinstance(exc, _err.SpavikConflict) and exc.code in {
-        "NO_PENDING_OUTCOMES", "REFRESH_IN_PROGRESS"}
+    return exc.code == "NO_PENDING_OUTCOMES"
+
+
+def _model_data(response):
+    model = dict(response.get("model") or response)
+    if isinstance(response.get("version"), dict):
+        model["training"] = response["version"]
+    return model
 
 
 # --------------------------------------------------------------------------
@@ -187,6 +178,15 @@ class _ModelBase:
         return self._donnees.get("engine")
 
     @property
+    def engine_family(self) -> Optional[str]:
+        return self._donnees.get("engine_family")
+
+    @property
+    def training(self) -> Optional[Dict[str, Any]]:
+        """Initial training diagnostics, including calibration when available."""
+        return self._donnees.get("training")
+
+    @property
     def features(self) -> List[str]:
         """Les colonnes que predict doit porter (`feature_columns` chez l'API).
         Vide quand l'API ne les a pas enregistrees."""
@@ -197,12 +197,11 @@ class _ModelBase:
 class Model(_ModelBase):
     """Un modele entraine, et les quatre operations qui s'appliquent a lui."""
 
-    def predict(self, rows: Any) -> Prediction:
+    def predict(self, rows: Any, *, engine_version: Optional[str] = None) -> Prediction:
         """Score des lignes. Facture, par ligne, les credits du moteur qui sert
         le modele : un sur le moteur par defaut."""
-        plan = _ops.predict(self.id, rows)
-        cout = plan.cout * self._client._prix(self.engine)
-        return _resultat(self._client._envoyer(plan.requete), cout, Prediction)
+        plan = _ops.predict(self.id, rows, engine_version=engine_version)
+        return _resultat(self._client._envoyer(plan.requete), None, Prediction)
 
     def submit_outcomes(self, outcomes: Any) -> Resultat:
         """Remonte ce qui est reellement arrive. Gratuit."""
@@ -240,12 +239,9 @@ class Model(_ModelBase):
         self._client._envoyer(_ops.restore(self.id).requete)
 
     def performance(self, days: int = 30) -> Optional[Resultat]:
-        """Performance constatee. `None` si le journal analytique n'est pas en place."""
+        """Observed performance and training calibration; API failures are raised."""
         plan = _ops.performance(self.id, days)
-        try:
-            return _resultat(self._client._envoyer(plan.requete), 0)
-        except _err.SpavikUnavailable:
-            return None
+        return _resultat(self._client._envoyer(plan.requete), 0)
 
     def reload(self) -> "Model":
         self._donnees = self._client.model(self.id)._donnees
@@ -255,10 +251,9 @@ class Model(_ModelBase):
 class AsyncModel(_ModelBase):
     """Meme objet, memes noms, en asynchrone."""
 
-    async def predict(self, rows: Any) -> Prediction:
-        plan = _ops.predict(self.id, rows)
-        cout = plan.cout * await self._client._prix(self.engine)
-        return _resultat(await self._client._envoyer(plan.requete), cout, Prediction)
+    async def predict(self, rows: Any, *, engine_version: Optional[str] = None) -> Prediction:
+        plan = _ops.predict(self.id, rows, engine_version=engine_version)
+        return _resultat(await self._client._envoyer(plan.requete), None, Prediction)
 
     async def submit_outcomes(self, outcomes: Any) -> Resultat:
         plan = _ops.submit_outcomes(self.id, outcomes)
@@ -288,10 +283,7 @@ class AsyncModel(_ModelBase):
 
     async def performance(self, days: int = 30) -> Optional[Resultat]:
         plan = _ops.performance(self.id, days)
-        try:
-            return _resultat(await self._client._envoyer(plan.requete), 0)
-        except _err.SpavikUnavailable:
-            return None
+        return _resultat(await self._client._envoyer(plan.requete), 0)
 
     async def reload(self) -> "AsyncModel":
         frais = await self._client.model(self.id)
@@ -302,6 +294,11 @@ class AsyncModel(_ModelBase):
 # --------------------------------------------------------------------------
 # Clients
 # --------------------------------------------------------------------------
+
+_REQUETE_FAMILLES = Requete(
+    methode="GET", chemin="/v1/engine-families", operation="engine_families",
+    delai=15.0, contexte="engine families",
+)
 
 _REQUETE_MOTEURS = Requete(
     methode="GET", chemin="/v1/engines", operation="engines",
@@ -340,8 +337,6 @@ class Spavik(_Base):
         super().__init__(api_key, base_url, timeout, max_retries, backoff, user_agent)
         self._http = client or httpx.Client(timeout=timeout)
         self._http_fourni = client is not None
-        self._moteur_defaut: Optional[str] = None
-        self._moteurs: Optional[list] = None
 
     def close(self) -> None:
         if not self._http_fourni:
@@ -366,7 +361,7 @@ class Spavik(_Base):
                 )
             except httpx.HTTPError as exc:
                 tracer(requete, None, time.monotonic() - debut, None, self.cle_api, tentative)
-                if reprenable(None, tentative, self.max_retries):
+                if tentative < self.max_retries and retry_allowed(None, None, requete.methode, requete.chemin, bool(requete.idempotence)):
                     time.sleep(self.backoff(tentative))
                     continue
                 raise _err.SpavikTransportError(
@@ -378,54 +373,23 @@ class Spavik(_Base):
                    _rid(corps, erreur), self.cle_api, tentative)
             if erreur is None:
                 return corps
-            if reprenable(reponse.status_code, tentative, self.max_retries):
-                time.sleep(self.backoff(tentative))
+            erreur.idempotency_key = requete.idempotence
+            if tentative < self.max_retries and retry_allowed(reponse.status_code, erreur.code, requete.methode, requete.chemin, bool(requete.idempotence)):
+                time.sleep(retry_delay(reponse.headers.get("Retry-After"), erreur.code, self.backoff(tentative)))
                 continue
             raise erreur
 
     # -- operations sans modele -------------------------------------------
-    def _moteur(self) -> Optional[str]:
-        """Resout le moteur par defaut, une seule fois par client.
-
-        L'API exige `engine` a la creation, alors que le contrat ne le compte pas
-        parmi les champs requis. Plutot que d'imposer a l'appelant de connaitre
-        le catalogue des moteurs des sa premiere ligne de code, on va le lire :
-        la route est publique, gratuite, et la reponse est mise de cote.
-        """
-        if self._moteur_defaut is not None:
-            return self._moteur_defaut or None
-        self._moteur_defaut = _moteur_par_defaut(self._catalogue()) or ""
-        return self._moteur_defaut or None
-
-    def _catalogue(self) -> list:
-        """Le catalogue des moteurs, lu une fois par client. Vide si l'API ne
-        repond pas : elle dira elle-meme ce qui manque, et elle le dit bien."""
-        if self._moteurs is None:
-            try:
-                entrees = self._envoyer(_REQUETE_MOTEURS)
-                self._moteurs = entrees if isinstance(entrees, list) else []
-            except _err.SpavikError:
-                self._moteurs = []
-        return self._moteurs
-
-    def _prix(self, moteur: Optional[str]) -> int:
-        """Credits par prediction sur ce moteur. Sans moteur connu, 1, sans appel."""
-        return _prix_du_moteur(self._catalogue(), moteur) if moteur else 1
-
     def train(self, data: Any, **kw: Any) -> Model:
         """Cree un modele et l'entraine, en un appel. Apprendre ne coute rien."""
         # Les controles locaux d'abord : un refus prononce ici ne doit toucher
         # ni le reseau ni le catalogue des moteurs.
         plan = _ops.train(data, **kw)
-        if not plan.requete.corps.get("engine"):
-            moteur = self._moteur()
-            if moteur:
-                plan.requete.corps["engine"] = moteur
         brut = self._envoyer(plan.requete) or {}
-        return self._modele(self, brut.get("model") or brut)
+        return self._modele(self, _model_data(brut))
 
     def forecast(self, data: Any, **kw: Any) -> Prevision:
-        """Forecast time series. One credit per requested horizon step per call."""
+        """Forecast time series. Billed by the API at horizon times the serving engine tariff, all series included."""
         plan = _ops.forecast(data, **kw)
         return _resultat(self._envoyer(plan.requete), plan.cout, Prevision)
 
@@ -469,13 +433,16 @@ class Spavik(_Base):
         """Reprend un modele existant par son identifiant."""
         plan = _ops.get_model(model_id)
         brut = self._envoyer(plan.requete) or {}
-        return self._modele(self, brut.get("model") or brut)
+        return self._modele(self, _model_data(brut))
+
+    def engine_families(self) -> List[Dict[str, Any]]:
+        """Families and the default selected by the API. Free."""
+        return self._envoyer(_REQUETE_FAMILLES)
 
     def engines(self) -> List[Dict[str, Any]]:
         """Les moteurs disponibles, tels que l'API les decrit (id, label, status).
 
-        Celui dont le `status` vaut `default` est pris quand `train` ne recoit
-        pas de moteur. Gratuit.
+        The API selects defaults within the chosen family. Free.
         """
         entrees = self._envoyer(_REQUETE_MOTEURS)
         return [dict(e) for e in entrees if isinstance(e, Mapping)] if isinstance(entrees, list) else []
@@ -507,8 +474,6 @@ class AsyncSpavik(_Base):
         super().__init__(api_key, base_url, timeout, max_retries, backoff, user_agent)
         self._http = client or httpx.AsyncClient(timeout=timeout)
         self._http_fourni = client is not None
-        self._moteur_defaut: Optional[str] = None
-        self._moteurs: Optional[list] = None
 
     async def aclose(self) -> None:
         if not self._http_fourni:
@@ -533,7 +498,7 @@ class AsyncSpavik(_Base):
                 )
             except httpx.HTTPError as exc:
                 tracer(requete, None, time.monotonic() - debut, None, self.cle_api, tentative)
-                if reprenable(None, tentative, self.max_retries):
+                if tentative < self.max_retries and retry_allowed(None, None, requete.methode, requete.chemin, bool(requete.idempotence)):
                     await asyncio.sleep(self.backoff(tentative))
                     continue
                 raise _err.SpavikTransportError(
@@ -545,39 +510,17 @@ class AsyncSpavik(_Base):
                    _rid(corps, erreur), self.cle_api, tentative)
             if erreur is None:
                 return corps
-            if reprenable(reponse.status_code, tentative, self.max_retries):
-                await asyncio.sleep(self.backoff(tentative))
+            erreur.idempotency_key = requete.idempotence
+            if tentative < self.max_retries and retry_allowed(reponse.status_code, erreur.code, requete.methode, requete.chemin, bool(requete.idempotence)):
+                await asyncio.sleep(retry_delay(reponse.headers.get("Retry-After"), erreur.code, self.backoff(tentative)))
                 continue
             raise erreur
-
-    async def _moteur(self) -> Optional[str]:
-        """Voir Spavik._moteur : meme raison, meme mise de cote."""
-        if self._moteur_defaut is not None:
-            return self._moteur_defaut or None
-        self._moteur_defaut = _moteur_par_defaut(await self._catalogue()) or ""
-        return self._moteur_defaut or None
-
-    async def _catalogue(self) -> list:
-        if self._moteurs is None:
-            try:
-                entrees = await self._envoyer(_REQUETE_MOTEURS)
-                self._moteurs = entrees if isinstance(entrees, list) else []
-            except _err.SpavikError:
-                self._moteurs = []
-        return self._moteurs
-
-    async def _prix(self, moteur: Optional[str]) -> int:
-        return _prix_du_moteur(await self._catalogue(), moteur) if moteur else 1
 
     async def train(self, data: Any, **kw: Any) -> AsyncModel:
         # Les controles locaux d'abord, comme en synchrone.
         plan = _ops.train(data, **kw)
-        if not plan.requete.corps.get("engine"):
-            moteur = await self._moteur()
-            if moteur:
-                plan.requete.corps["engine"] = moteur
         brut = await self._envoyer(plan.requete) or {}
-        return self._modele(self, brut.get("model") or brut)
+        return self._modele(self, _model_data(brut))
 
     async def forecast(self, data: Any, **kw: Any) -> Prevision:
         plan = _ops.forecast(data, **kw)
@@ -609,6 +552,10 @@ class AsyncSpavik(_Base):
             for entree in lot:
                 yield self._modele(self, entree)
 
+    async def engine_families(self) -> List[Dict[str, Any]]:
+        """Families and the default selected by the API. Free."""
+        return await self._envoyer(_REQUETE_FAMILLES)
+
     async def engines(self) -> List[Dict[str, Any]]:
         """Les moteurs disponibles, tels que l'API les decrit (id, label, status)."""
         entrees = await self._envoyer(_REQUETE_MOTEURS)
@@ -622,7 +569,7 @@ class AsyncSpavik(_Base):
     async def model(self, model_id: str) -> AsyncModel:
         plan = _ops.get_model(model_id)
         brut = await self._envoyer(plan.requete) or {}
-        return self._modele(self, brut.get("model") or brut)
+        return self._modele(self, _model_data(brut))
 
 
 def _rid(corps: Any, erreur: Optional[_err.SpavikError]) -> Optional[str]:

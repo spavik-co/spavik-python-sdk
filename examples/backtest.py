@@ -11,5 +11,5 @@ args = parser.parse_args()
 if not os.environ.get("SPAVIK_API_KEY"):
     parser.error("Set SPAVIK_API_KEY in your environment.")
 with Spavik() as client:
-    report = client.backtest(args.csv, target="sales", horizon=7, timestamp="date", item_id="store", point_estimate="median", quantiles=[0.1, 0.5, 0.9])
+    report = client.backtest(args.csv, target="sales", horizon=7, timestamp="date", item_id="store", point_estimate="median", quantiles=[0.1, 0.5, 0.9], include_backtest_predictions=True)
     print(json.dumps(report, indent=2))

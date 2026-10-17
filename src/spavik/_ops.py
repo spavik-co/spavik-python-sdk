@@ -1,7 +1,7 @@
 """Les sept operations, decrites une seule fois.
 
 Chaque fonction fait tout ce qui ne demande pas le reseau : normaliser les
-entrees, appliquer les controles locaux, calculer le cout, et batir la requete.
+entrees, appliquer les controles locaux, et batir la requete.
 Les clients synchrone et asynchrone se contentent ensuite de l'envoyer. C'est ce
 qui garantit qu'ils se comportent a l'identique, y compris dans leurs refus.
 """
@@ -19,10 +19,10 @@ from .errors import SpavikDataError
 
 @dataclass
 class Plan:
-    """Une requete prete a partir, et ce qu'elle coutera."""
+    """Une requete prete a partir ; cout inconnu pour les operations facturees."""
 
     requete: Requete
-    cout: int = 0
+    cout: Optional[int] = 0
 
 
 def _delai(nom: str) -> float:
@@ -33,7 +33,7 @@ def train(
     data: Any,
     *,
     target: str,
-    engine: Optional[str] = None,
+    engine_family: Optional[str] = None,
     name: Optional[str] = None,
     explain: Optional[bool] = None,
     auto_update: Optional[bool] = None,
@@ -42,7 +42,7 @@ def train(
     _validate.entrainement(lignes, target)
 
     corps: Dict[str, Any] = {"target": target, "data": lignes}
-    for cle, valeur in (("engine", engine), ("name", name),
+    for cle, valeur in (("engine_family", engine_family), ("name", name),
                         ("explain", explain), ("auto_update", auto_update)):
         if valeur is not None:
             corps[cle] = valeur
@@ -59,18 +59,24 @@ def forecast(
     *,
     target: str,
     horizon: int,
+    backtest: Optional[bool] = None,
     timestamp: Optional[str] = None,
     quantiles: Optional[List[float]] = None,
     item_id: Optional[str] = None,
     point_estimate: Optional[str] = None,
+    engine_family: Optional[str] = None,
+    engine_version: Optional[str] = None,
+    include_backtest_predictions: Optional[bool] = None,
 ) -> Plan:
     lignes = _data.normaliser(data, quoi="series to forecast")
     _validate.previsions(lignes, target, horizon, timestamp)
-    cout = _validate.cout_prevision(horizon)
+    cout = None  # The API does not expose the charged amount.
 
     corps: Dict[str, Any] = {"target": target, "horizon": horizon, "data": lignes}
     for cle, valeur in (("timestamp", timestamp), ("quantiles", quantiles),
-                        ("item_id", item_id), ("point_estimate", point_estimate)):
+                        ("item_id", item_id), ("point_estimate", point_estimate),
+                        ("engine_family", engine_family), ("engine_version", engine_version),
+                        ("backtest", backtest), ("include_backtest_predictions", include_backtest_predictions)):
         if valeur is not None:
             corps[cle] = valeur
 
@@ -81,17 +87,16 @@ def forecast(
     ), cout=cout)
 
 
-def predict(model_id: str, rows: Any) -> Plan:
+def predict(model_id: str, rows: Any, *, engine_version: Optional[str] = None) -> Plan:
     lignes = _data.normaliser(rows, quoi="rows to score")
     _validate.prediction(lignes)
     return Plan(Requete(
         methode="POST", chemin=f"/v1/models/{model_id}/predict", operation="predict",
-        corps={"rows": lignes}, delai=_delai("predict"),
-        # Le contrat ne declare pas l'en-tete sur cette route, mais l'API
-        # l'honore : la poser protege d'un second debit a la reprise.
+        corps={"rows": lignes, **({"engine_version": engine_version} if engine_version is not None else {})}, delai=_delai("predict"),
+        # Preserve the same key and body throughout retries.
         idempotence=nouvelle_cle_idempotence(),
         contexte="prediction",
-    ), cout=_validate.cout_prediction(lignes))
+    ), cout=None)
 
 
 def submit_outcomes(model_id: str, outcomes: Any) -> Plan:
@@ -132,14 +137,14 @@ def list_models(limit: int, offset: int, status: Optional[str] = None) -> Plan:
     ), cout=0)
 
 
-def evaluate(data: Any, *, target: str, engine: Optional[str] = None) -> Plan:
+def evaluate(data: Any, *, target: str, engine_family: Optional[str] = None) -> Plan:
     """Le rapport de validation de l'entrainement et un essai du moteur, sans
     rien creer ni debiter. Aucun controle local : c'est l'API qui juge, et
     elle dit quoi corriger en premier."""
     lignes = _data.normaliser(data, quoi="data to evaluate")
     corps: Dict[str, Any] = {"target": target, "data": lignes}
-    if engine is not None:
-        corps["engine"] = engine
+    if engine_family is not None:
+        corps["engine_family"] = engine_family
     return Plan(Requete(
         methode="POST", chemin="/v1/datasets/evaluate", operation="evaluate", corps=corps,
         delai=_delai("train"), contexte="data evaluation",
@@ -155,6 +160,9 @@ def backtest(
     item_id: Optional[str] = None,
     quantiles: Optional[List[float]] = None,
     point_estimate: Optional[str] = None,
+    engine_family: Optional[str] = None,
+    engine_version: Optional[str] = None,
+    include_backtest_predictions: Optional[bool] = None,
 ) -> Plan:
     """Valide une serie et rejoue des fenetres de son historique, sans rendre
     de prevision et sans debiter. L'API juge, comme pour evaluate."""
@@ -164,7 +172,9 @@ def backtest(
         raise SpavikDataError(f"the horizon must be at least 1, got {horizon}. Nothing was sent.")
     corps: Dict[str, Any] = {"target": target, "data": lignes}
     for cle, valeur in (("horizon", horizon), ("timestamp", timestamp), ("item_id", item_id),
-                        ("quantiles", quantiles), ("point_estimate", point_estimate)):
+                        ("quantiles", quantiles), ("point_estimate", point_estimate),
+                        ("engine_family", engine_family), ("engine_version", engine_version),
+                        ("include_backtest_predictions", include_backtest_predictions)):
         if valeur is not None:
             corps[cle] = valeur
     return Plan(Requete(

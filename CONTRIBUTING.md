@@ -6,7 +6,7 @@ customer datasets. Security reports go through [SECURITY.md](SECURITY.md).
 
 ## Install from source
 
-Requires Python 3.9 or newer. Until the first PyPI release:
+Requires Python 3.11 or newer. Until the first PyPI release:
 
 ```sh
 python -m pip install "git+https://github.com/spavik-co/spavik-python-sdk.git@dev"
@@ -19,12 +19,11 @@ For local development, clone `dev` and use the checks below.
 Run from the repository root:
 
 ```sh
-python -m venv .venv
+uv sync --locked --all-extras
 source .venv/bin/activate
-python -m pip install -e ".[dev,pandas]"
 python scripts/generate_contract.py --check
 python -m pytest -q
-python -m build
+python -m build --no-isolation
 python -m twine check dist/*
 python scripts/check_package.py
 ```
@@ -59,3 +58,60 @@ Requests authenticate with `X-Spavik-Api-Key`. `X-Spavik-Client-Name` is
 The application can customize its User-Agent with `Spavik(user_agent="my-agent/1.0")`;
 this does not change the SDK identity headers. Without that option, the
 User-Agent contains the SDK name and version.
+
+## Current API contract
+
+Model creation and evaluation select an optional engine family; the API owns
+the default. Prediction selects an optional engine version within that family.
+Forecast and backtest accept both. Changing engine version within a model's
+family does not require retraining. Engine versions and model data versions
+are distinct; the exact serving engine is available on prediction/forecast
+results as `engine`. The family catalogue is a separate API resource.
+
+```python
+model = client.train(rows, target="churn", engine_family="presage")
+result = model.predict(new_rows, engine_version="presage-latest")
+families = client.engine_families()
+report = client.backtest(history, target="sales", horizon=7,
+                         engine_family="presage", include_backtest_predictions=True)
+```
+
+Historical backtest predictions are not future forecasts. To include them in
+a forecast response, also enable `backtest`. Diagnostics are returned unchanged:
+calibration describes probabilities on the initial test set; it does not
+recalibrate them or guarantee reliability. Model `training` retains the initial
+version diagnostics, including calibration. Evaluation and performance retain
+their complete API reports.
+
+`cout` is `None` in Python / `null` in TypeScript for billable calls because the
+API does not return the exact debit. The SDK does not calculate it from the
+training engine or assume a tariff of one. Free operations keep a cost of zero.
+Forecast billing is horizon times the serving engine tariff, all series included.
+
+HTTP correlation uses `X-Spavik-Request-Id`; each prediction row's `request_id`
+is a separate identifier used to submit outcomes. Retries honor `Retry-After`
+and preserve the original idempotency key and payload. `REQUEST_INTERRUPTED`
+and `IDEMPOTENCY_RESPONSE_UNAVAILABLE` are raised immediately: inspect the request
+log or contact support with the HTTP request ID, without creating a new key.
+
+Data preparation makes data valid: types, missingness, duplicates, availability
+at the prediction cutoff and leakage checks. Feature engineering makes signal
+easier to learn: recency, trailing aggregates, calendar features and lags.
+The SDK sends prepared rows; it does not create these features automatically.
+Generate and reuse the same transformation code for training and prediction,
+using only information available at each cutoff. Learned transformations must
+be fitted on training partitions, never on the complete evaluation dataset.
+
+
+## Dependency maintenance
+
+Development requires Python 3.11 or later and uv 0.13.0. Install uv using
+the [official instructions](https://docs.astral.sh/uv/getting-started/installation/).
+`uv sync --locked --all-extras` creates the development environment from
+`uv.lock`; run `uv pip check` and `uv run --locked --all-extras pip-audit --skip-editable`
+to verify it. The SDK's public dependency ranges remain independent of the
+development lockfile. To update dependencies, run `uv lock --upgrade`, review
+the diff, synchronize, and run all tests and the audit before merging.
+Build-backend constraints in `pyproject.toml` must be updated together with
+their matching lock entries. CI audits the installed dependencies without
+ignoring advisories. No automatic deployment or publication is configured.
