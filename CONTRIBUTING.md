@@ -115,3 +115,10 @@ the diff, synchronize, and run all tests and the audit before merging.
 Build-backend constraints in `pyproject.toml` must be updated together with
 their matching lock entries. CI audits the installed dependencies without
 ignoring advisories. No automatic deployment or publication is configured.
+
+Dependabot checks routine updates on Mondays at 08:00 Europe/Paris. Minor and
+patch updates are grouped into one PR per ecosystem, with at most one open
+routine PR per ecosystem. Major upgrades, including GitHub Actions, require
+an explicit compatibility review and are prepared separately. Security alerts
+and security updates are not filtered by this version-update policy; the CI
+vulnerability audits remain enabled.
