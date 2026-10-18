@@ -55,6 +55,36 @@ python quickstart.py
 `result.lignes` contains the predictions returned by the API. Reuse the trained
 model for subsequent predictions; you do not need to train for every request.
 
+## Timeouts and uncertain results
+
+`Spavik(timeout=0.25)` and `AsyncSpavik(timeout=0.25)` apply that timeout to
+every request, including retries. It overrides each operation's default.
+Omit `timeout` or pass `None` to keep operation defaults, such as 15 seconds
+for account usage, 120 for training and 60 for forecasting. The timeout applies
+to each [HTTPX network phase](https://www.python-httpx.org/advanced/timeouts/)
+of each attempt, not to the total duration of an operation
+with retries and backoff.
+
+When network retries are exhausted, `SpavikTransportError.idempotency_key`
+preserves the key used for an idempotent request, and `__cause__` retains the
+underlying HTTPX error. A read request has no idempotency key.
+After a timeout, the server may already have executed the request. Keep the key
+and request details to inspect the outcome or contact support. Do not blindly
+call the mutation again: a new SDK call generates a new key and can repeat the
+operation. The SDK does not expose a resume-by-key method.
+
+## Input formats
+
+The SDK accepts dictionaries, lists of dictionaries, DataFrames, raw CSV/JSON
+text and file paths. JSON strings containing URLs or paths remain JSON content.
+Use `pathlib.Path` to explicitly identify a file, including filenames that start
+with `[` or `{`, or have no extension.
+
+CSV headers must be unique and non-empty. Rows with more fields than the header
+and invalid quoting raise `SpavikDataError` with the line number before any API
+call. Missing values in shorter rows remain `None`; quoted commas and newlines
+are preserved.
+
 ## What you can do
 
 - Classification and regression

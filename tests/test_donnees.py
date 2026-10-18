@@ -54,6 +54,43 @@ def test_fichier_absent_dit_le_chemin():
     assert "/chemin/qui/nexiste/pas.csv" in str(exc.value)
 
 
+def test_pathlike_est_un_chemin_meme_sans_extension(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    monkeypatch.chdir(tmp_path)
+    Path("dataset").write_text("x,target\n1,0\n", encoding="utf-8")
+    assert normaliser(Path("dataset")) == [{"x": 1, "target": 0}]
+    with pytest.raises(SpavikDataError, match="file not found"):
+        normaliser(Path("missing"))
+
+
+def test_pathlike_json_commencant_par_crochet(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    monkeypatch.chdir(tmp_path)
+    path = Path("[dataset].json")
+    path.write_text('[{"url":"https://example.invalid","target":0}]', encoding="utf-8")
+    assert normaliser(path) == [{"url": "https://example.invalid", "target": 0}]
+
+
+@pytest.mark.parametrize("content", ['[{"x":', '\ufeff[{"x":'])
+def test_json_invalide_est_une_erreur_de_donnees(content):
+    with pytest.raises(SpavikDataError, match="invalid JSON at line"):
+        normaliser(content)
+
+
+def test_json_brut_avec_bom():
+    assert normaliser('\ufeff [{"url":"https://example.invalid"}]') == [
+        {"url": "https://example.invalid"}]
+
+
+def test_csv_fichier_invalide_indique_la_ligne(tmp_path):
+    path = tmp_path / "bad.csv"
+    path.write_text("x,target\n1,0\n2,1,LOST\n", encoding="utf-8")
+    with pytest.raises(SpavikDataError, match="bad.csv: CSV line 3"):
+        normaliser(path)
+
+
 def test_liste_vide_refusee():
     with pytest.raises(SpavikDataError):
         normaliser([])

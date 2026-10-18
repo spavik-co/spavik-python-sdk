@@ -174,7 +174,7 @@ class _Base:
         self,
         cle_api: Optional[str],
         base_url: Optional[str],
-        delai_defaut: float,
+        delai_defaut: Optional[float],
         max_retries: int = REPRISES_MAX,
         backoff: Any = None,
         user_agent: Optional[str] = None,
@@ -192,3 +192,7 @@ class _Base:
 
     def _url(self, chemin: str) -> str:
         return f"{self.base_url}{chemin}"
+
+    def _delai(self, requete: Requete) -> float:
+        """Un delai explicite prime ; sinon conserver celui de l'operation."""
+        return requete.delai if self.delai_defaut is None else self.delai_defaut

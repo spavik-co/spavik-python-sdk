@@ -314,7 +314,8 @@ _REQUETE_USAGE = Requete(
 
 
 class Spavik(_Base):
-    """Client synchrone.
+    """Synchronous client. An explicit timeout overrides every operation's
+    network timeout, per attempt. Omit it or use None for operation defaults.
 
     >>> spavik = Spavik()                          # lit SPAVIK_API_KEY
     >>> model = spavik.train("churn.csv", target="churn")
@@ -329,7 +330,7 @@ class Spavik(_Base):
         *,
         base_url: Optional[str] = None,
         user_agent: Optional[str] = None,
-        timeout: float = 30.0,
+        timeout: Optional[float] = None,
         max_retries: int = 3,
         backoff: Optional[Any] = None,
         client: Optional[httpx.Client] = None,
@@ -357,16 +358,18 @@ class Spavik(_Base):
                 reponse = self._http.request(
                     requete.methode, self._url(requete.chemin),
                     headers=requete.entetes(self.cle_api, self.user_agent),
-                    json=requete.corps, params=requete.parametres, timeout=requete.delai,
+                    json=requete.corps, params=requete.parametres, timeout=self._delai(requete),
                 )
             except httpx.HTTPError as exc:
                 tracer(requete, None, time.monotonic() - debut, None, self.cle_api, tentative)
                 if tentative < self.max_retries and retry_allowed(None, None, requete.methode, requete.chemin, bool(requete.idempotence)):
                     time.sleep(self.backoff(tentative))
                     continue
-                raise _err.SpavikTransportError(
+                erreur = _err.SpavikTransportError(
                     f"{requete.contexte or requete.operation}: {type(exc).__name__}: {exc}"
-                ) from exc
+                )
+                erreur.idempotency_key = requete.idempotence
+                raise erreur from exc
 
             corps, erreur = interpreter(reponse.status_code, reponse.headers, reponse.text, requete)
             tracer(requete, reponse.status_code, time.monotonic() - debut,
@@ -456,7 +459,8 @@ class Spavik(_Base):
 
 
 class AsyncSpavik(_Base):
-    """Client asynchrone. Memes noms, memes refus, memes resultats."""
+    """Asynchronous client, with the same operations and timeout precedence
+    as Spavik. Omit timeout or use None for operation defaults."""
 
     _modele = AsyncModel
 
@@ -466,7 +470,7 @@ class AsyncSpavik(_Base):
         *,
         base_url: Optional[str] = None,
         user_agent: Optional[str] = None,
-        timeout: float = 30.0,
+        timeout: Optional[float] = None,
         max_retries: int = 3,
         backoff: Optional[Any] = None,
         client: Optional[httpx.AsyncClient] = None,
@@ -494,16 +498,18 @@ class AsyncSpavik(_Base):
                 reponse = await self._http.request(
                     requete.methode, self._url(requete.chemin),
                     headers=requete.entetes(self.cle_api, self.user_agent),
-                    json=requete.corps, params=requete.parametres, timeout=requete.delai,
+                    json=requete.corps, params=requete.parametres, timeout=self._delai(requete),
                 )
             except httpx.HTTPError as exc:
                 tracer(requete, None, time.monotonic() - debut, None, self.cle_api, tentative)
                 if tentative < self.max_retries and retry_allowed(None, None, requete.methode, requete.chemin, bool(requete.idempotence)):
                     await asyncio.sleep(self.backoff(tentative))
                     continue
-                raise _err.SpavikTransportError(
+                erreur = _err.SpavikTransportError(
                     f"{requete.contexte or requete.operation}: {type(exc).__name__}: {exc}"
-                ) from exc
+                )
+                erreur.idempotency_key = requete.idempotence
+                raise erreur from exc
 
             corps, erreur = interpreter(reponse.status_code, reponse.headers, reponse.text, requete)
             tracer(requete, reponse.status_code, time.monotonic() - debut,

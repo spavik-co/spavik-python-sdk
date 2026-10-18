@@ -26,13 +26,39 @@ def _depuis_csv(texte: str, origine: str) -> Lignes:
         dialecte = csv.Sniffer().sniff(echantillon, delimiters=",;\t|")
     except csv.Error:
         dialecte = csv.excel
-    lecteur = csv.DictReader(io.StringIO(texte), dialect=dialecte)
-    if not lecteur.fieldnames:
-        raise SpavikDataError(f"{origine}: no readable header row.")
-    lignes = [{k: _typer(v) for k, v in ligne.items() if k is not None} for ligne in lecteur]
+    lecteur = csv.DictReader(io.StringIO(texte), dialect=dialecte, strict=True)
+    lignes: Lignes = []
+    try:
+        entetes = lecteur.fieldnames
+        if not entetes:
+            raise SpavikDataError(f"{origine}: no readable header row.")
+        if any(not nom.strip() for nom in entetes) or len(set(entetes)) != len(entetes):
+            raise SpavikDataError(
+                f"{origine}: CSV line {lecteur.line_num}: headers must be unique and non-empty."
+            )
+        for ligne in lecteur:
+            if None in ligne:
+                raise SpavikDataError(
+                    f"{origine}: CSV line {lecteur.line_num}: more fields than the header."
+                )
+            lignes.append({k: _typer(v) for k, v in ligne.items()})
+    except csv.Error as exc:
+        raise SpavikDataError(
+            f"{origine}: CSV line {lecteur.reader.line_num}: invalid CSV ({exc})."
+        ) from exc
     if not lignes:
         raise SpavikDataError(f"{origine}: header present, but no data rows.")
     return lignes
+
+
+def _depuis_json(texte: str, origine: str) -> Lignes:
+    try:
+        contenu = json.loads(texte)
+    except json.JSONDecodeError as exc:
+        raise SpavikDataError(
+            f"{origine}: invalid JSON at line {exc.lineno}, column {exc.colno}."
+        ) from exc
+    return normaliser(contenu, quoi=origine)
 
 
 def _typer(valeur: Any) -> Any:
@@ -82,9 +108,14 @@ def normaliser(source: Any, *, quoi: str = "data") -> Lignes:
         return _depuis_dataframe(source)
 
     if isinstance(source, (str, os.PathLike)):
-        chemin = os.fspath(source)
-        # Une chaine est un chemin si elle en a l'air, sinon on la lit comme du contenu.
-        ressemble = (
+        # PathLike est explicite. Une chaine JSON reste du contenu, meme avec
+        # des URL ou des chemins dans ses valeurs.
+        if isinstance(source, str):
+            texte = source.lstrip("\ufeff \t\r\n")
+            if texte.startswith(("[", "{")):
+                return _depuis_json(texte, quoi)
+        chemin = os.fsdecode(source)
+        ressemble = isinstance(source, os.PathLike) or (
             len(chemin) < 4096
             and "\n" not in chemin
             and (chemin.lower().endswith(_EXTENSIONS_CSV) or chemin.lower().endswith(".json")
@@ -96,11 +127,9 @@ def normaliser(source: Any, *, quoi: str = "data") -> Lignes:
             with open(chemin, "r", encoding="utf-8-sig", newline="") as f:
                 contenu = f.read()
             if chemin.lower().endswith(".json"):
-                return normaliser(json.loads(contenu), quoi=quoi)
+                return _depuis_json(contenu, chemin)
             return _depuis_csv(contenu, chemin)
-        if chemin.lstrip().startswith(("[", "{")):
-            return normaliser(json.loads(chemin), quoi=quoi)
-        return _depuis_csv(chemin, quoi)
+        return _depuis_csv(chemin.lstrip("\ufeff"), quoi)
 
     if isinstance(source, dict):
         return [dict(source)]

@@ -62,7 +62,9 @@ class SpavikDataError(SpavikError):
 
 
 class SpavikTransportError(SpavikError):
-    """Le reseau a lache, ou la reponse n'est pas exploitable."""
+    """Network failure or unreadable response. An idempotent request retains
+    its idempotency_key for investigating an uncertain outcome. A new SDK call
+    creates a new key and must not be used as a blind retry of a mutation."""
 
 
 class SpavikAuthError(SpavikError):
