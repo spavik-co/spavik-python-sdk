@@ -85,6 +85,41 @@ and invalid quoting raise `SpavikDataError` with the line number before any API
 call. Missing values in shorter rows remain `None`; quoted commas and newlines
 are preserved.
 
+## Outcome feedback and data retention
+
+Zero Data Retention only disables GCS/BigQuery archiving of the inputs and
+outputs of `evaluate`, `backtest`, `forecast` and `predict`. API contracts and
+behavior are identical for every data policy. Successful idempotent responses
+remain replayable from the PostgreSQL technical cache for 24 hours. There is no prediction-history endpoint on any plan,
+and no `model.predictions()` method. Save prediction results and their
+`request_id` values in your application if you need them later. The API request
+log contains technical metadata, not prediction values.
+
+Model creation, context, diagnostics, versions and outcome feedback are
+functional model data. They require no additional retention opt-in, including
+under Zero Data Retention:
+
+```python
+from spavik import Spavik
+
+with Spavik() as client:
+    model = client.train("churn.csv", target="churn")
+    model.submit_outcomes([
+        {"features": {"plan": "pro", "seats": 12, "tickets_90d": 2}, "actual": 1},
+    ])
+    model.refresh()
+```
+
+Every outcome requires a non-empty `features` object and `actual`, on every
+plan. An optional `request_id` is correlation metadata; no inference archive
+is queried to recover features. Pending outcomes remain available until integration or model deletion.
+Examples integrated into the model become part of its persistent context.
+To measure prediction quality, also provide the original `prediction`, `version`
+and exact `engine`, plus `probabilities` when available. These client-reported
+measurements populate `observed` and `quality_reports`, with source
+`client_reported_predictions`; inference archives are never used for performance.
+The same rules apply to `Spavik` and `AsyncSpavik`.
+
 ## What you can do
 
 - Classification and regression

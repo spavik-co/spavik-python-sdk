@@ -88,5 +88,27 @@ def test_verite_sans_rattachement(spavik, api, churn):
     api.appels.clear()
     with pytest.raises(SpavikDataError) as exc:
         modele.submit_outcomes([{"actual": 1}])
-    assert "which prediction" in str(exc.value)
+    assert "'features' as a non-empty object" in str(exc.value)
+    assert api.appels == []
+
+
+@pytest.mark.parametrize("features", [None, {}, [], "invalid"])
+def test_outcome_request_id_ne_remplace_pas_features(spavik, api, churn, features):
+    modele = spavik.train(churn, target="churn")
+    api.appels.clear()
+    with pytest.raises(SpavikDataError, match="'features' as a non-empty object"):
+        modele.submit_outcomes([
+            {"features": {"plan": "pro"}, "actual": 1},
+            {"request_id": "req_existing", "features": features, "actual": 0},
+        ])
+    assert api.appels == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("features", [None, {}, [], "invalid"])
+async def test_outcome_features_obligatoires_aussi_en_async(aspavik, api, churn, features):
+    modele = await aspavik.train(churn, target="churn")
+    api.appels.clear()
+    with pytest.raises(SpavikDataError, match="'features' as a non-empty object"):
+        await modele.submit_outcomes({"request_id": "req_existing", "features": features, "actual": 0})
     assert api.appels == []

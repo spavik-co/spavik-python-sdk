@@ -153,11 +153,6 @@ class ApiSimulee:
                 "credits_remaining": self.solde},
                 {"X-Spavik-Predictions-Remaining": str(self.solde)})
 
-        if chemin.endswith("/predictions"):
-            n = min(int(requete.url.params.get("limit", 50)), self._scores)
-            return self._json(200, [{"request_id": f"req_p{i:04d}", "prediction": 1,
-                                     "scored_at": "2026-09-14T10:00:00Z"} for i in range(n)])
-
         if chemin.endswith("/outcomes"):
             recues = len(corps.get("outcomes") or [])
             self.pending_outcomes += recues

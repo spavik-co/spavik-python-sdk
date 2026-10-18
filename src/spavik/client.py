@@ -204,7 +204,7 @@ class Model(_ModelBase):
         return _resultat(self._client._envoyer(plan.requete), None, Prediction)
 
     def submit_outcomes(self, outcomes: Any) -> Resultat:
-        """Remonte ce qui est reellement arrive. Gratuit."""
+        """Report observed outcomes. Every outcome requires features and actual. Free."""
         plan = _ops.submit_outcomes(self.id, outcomes)
         return _resultat(self._client._envoyer(plan.requete), 0)
 
@@ -221,13 +221,6 @@ class Model(_ModelBase):
             if _refresh_absorbe(exc):
                 return None
             raise
-
-    def predictions(self, *, limit: int = 50) -> List[Dict[str, Any]]:
-        """Les dernieres predictions servies par ce modele, avec leur request_id,
-        pour rattacher des verites ensuite. Gratuit. Vide tant que le journal
-        n'est pas en place."""
-        brut = self._client._envoyer(_ops.predictions(self.id, limit).requete)
-        return [dict(e) for e in brut if isinstance(e, Mapping)] if isinstance(brut, list) else []
 
     def archive(self) -> None:
         """Archive le modele : il cesse de servir et rend sa place du quota.
@@ -267,11 +260,6 @@ class AsyncModel(_ModelBase):
             if _refresh_absorbe(exc):
                 return None
             raise
-
-    async def predictions(self, *, limit: int = 50) -> List[Dict[str, Any]]:
-        """Voir Model.predictions. Gratuit."""
-        brut = await self._client._envoyer(_ops.predictions(self.id, limit).requete)
-        return [dict(e) for e in brut if isinstance(e, Mapping)] if isinstance(brut, list) else []
 
     async def archive(self) -> None:
         """Voir Model.archive. Gratuit, reversible par restore."""
@@ -384,7 +372,11 @@ class Spavik(_Base):
 
     # -- operations sans modele -------------------------------------------
     def train(self, data: Any, **kw: Any) -> Model:
-        """Cree un modele et l'entraine, en un appel. Apprendre ne coute rien."""
+        """Create and train a model without consuming prediction credits.
+
+        Model state and outcome feedback are functional data, including under
+        Zero Data Retention. No additional retention opt-in is required.
+        """
         # Les controles locaux d'abord : un refus prononce ici ne doit toucher
         # ni le reseau ni le catalogue des moteurs.
         plan = _ops.train(data, **kw)
@@ -523,6 +515,7 @@ class AsyncSpavik(_Base):
             raise erreur
 
     async def train(self, data: Any, **kw: Any) -> AsyncModel:
+        """See Spavik.train; model state does not require a retention opt-in."""
         # Les controles locaux d'abord, comme en synchrone.
         plan = _ops.train(data, **kw)
         brut = await self._envoyer(plan.requete) or {}

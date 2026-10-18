@@ -97,9 +97,8 @@ def previsions(lignes: Lignes, cible: str, horizon: int, timestamp: Optional[str
 def verites(lignes: Lignes) -> None:
     """Chaque verite dit ce qui est arrive, et de quelle prediction elle parle.
 
-    `actual` porte la valeur observee. L'identification passe soit par le
-    `request_id` de la prediction d'origine, soit par les caracteristiques
-    completes de la ligne. Sans l'un ou l'autre, l'API ne peut rien rattacher.
+    `actual` porte la valeur observee et `features` la ligne complete.
+    `request_id` reste une correlation facultative, sans recherche d'archive.
     """
     if not lignes:
         raise SpavikDataError("no outcomes to report. Nothing was sent.")
@@ -114,11 +113,11 @@ def verites(lignes: Lignes) -> None:
             f"first: {_apercu(list(exemple))}.{proche}"
         )
 
-    orphelines = [i for i, v in enumerate(lignes)
-                  if not v.get("request_id") and not v.get("features")]
-    if orphelines:
+    invalides = [v for v in lignes
+                 if not isinstance(v.get("features"), dict) or not v["features"]]
+    if invalides:
         raise SpavikDataError(
-            f"{len(orphelines)} outcome(s) out of {len(lignes)} do not say which "
-            "prediction they relate to. Provide 'request_id', that of the original "
-            "prediction, or 'features', the full row."
+            f"{len(invalides)} outcome(s) out of {len(lignes)} require "
+            "'features' as a non-empty object. 'request_id' is optional "
+            "correlation metadata and cannot replace features."
         )

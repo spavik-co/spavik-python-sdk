@@ -20,9 +20,9 @@ def test_boucle_complete(spavik, api, churn):
     assert prediction.request_id
 
     verites = modele.submit_outcomes([
-        {"request_id": "req_1", "actual": 1},
-        {"request_id": "req_2", "actual": 0},
-        {"request_id": "req_3", "actual": 1},
+        {"request_id": "req_1", "features": {"plan": "pro", "seats": 12, "tickets_90d": 3}, "actual": 1},
+        {"request_id": "req_2", "features": {"plan": "pro", "seats": 12, "tickets_90d": 3}, "actual": 0},
+        {"request_id": "req_3", "features": {"plan": "pro", "seats": 12, "tickets_90d": 3}, "actual": 1},
     ])
     assert verites["accepted"] == 3
     assert verites.cout == 0
@@ -88,7 +88,7 @@ async def test_asynchrone_donne_le_meme_resultat(aspavik, api, churn):
     assert prediction.cout is None
     assert len(prediction.lignes) == 1
 
-    await modele.submit_outcomes([{"request_id": "req_1", "actual": 1}])
+    await modele.submit_outcomes([{"request_id": "req_1", "features": {"plan": "pro", "seats": 12, "tickets_90d": 3}, "actual": 1}])
     integration = await modele.refresh()
     assert integration["version"]["version"] == 2
 
@@ -218,11 +218,10 @@ def test_les_archives_se_listent_a_part(spavik, api, churn):
     assert [m.id for m in spavik.models(status="archived")] == [model.id]
 
 
-def test_l_historique_des_predictions_porte_les_request_id(spavik, api, churn):
+def test_la_reponse_de_prediction_porte_les_request_id(spavik, api, churn):
     model = spavik.train(churn, target="churn")
     r = model.predict([{"plan": "pro"}] * 3)
     assert [l["request_id"] for l in r.lignes] == ["req_p0000", "req_p0001", "req_p0002"]
-    assert [e["request_id"] for e in model.predictions(limit=2)] == ["req_p0000", "req_p0001"]
 
 
 async def test_restaurer_asynchrone_par_identifiant(aspavik, api, churn):

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Require non-empty `features` and `actual` for every outcome, regardless of
+  data policy. `request_id` is optional correlation metadata. Inference archival
+  policy does not change validation, performance or idempotent response replay.
+
+- Remove `model.predictions()`: prediction history has been removed from the
+  API for every plan. Keep prediction results and their `request_id` values
+  from `predict()` in your application.
+
+- Document inference-only Zero Data Retention and the outcome data needed for
+  model refresh and performance monitoring.
 - Honor explicit client timeouts in synchronous and asynchronous requests while
   preserving operation defaults when timeout is omitted or None.
 - Preserve the idempotency key on exhausted network errors for uncertain outcomes.

@@ -183,14 +183,6 @@ def backtest(
     ), cout=0)
 
 
-def predictions(model_id: str, limit: int) -> Plan:
-    return Plan(Requete(
-        methode="GET", chemin=f"/v1/models/{model_id}/predictions", operation="predictions",
-        parametres={"limit": limit}, delai=_delai("list_models"),
-        contexte=f"prediction history of {model_id}",
-    ), cout=0)
-
-
 def archive(model_id: str) -> Plan:
     """Archive : le modele cesse de servir et rend sa place du quota. Ses
     artefacts sont conserves, restore le remet en service. La suppression
