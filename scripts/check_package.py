@@ -30,6 +30,7 @@ with tempfile.TemporaryDirectory(prefix='spavik-wheel-') as directory:
     consumer.write_text('''import asyncio
 import hashlib
 import hmac
+import time
 from pathlib import Path
 import httpx
 import spavik
@@ -54,9 +55,10 @@ async def check_async():
         assert (await client.usage())["credit_balance"] == 7
 asyncio.run(check_async())
 assert len(calls) == 2
-body = b'{"event":"model.trained"}'
-signature = hmac.new(b"fixture", body, hashlib.sha256).hexdigest()
-assert verifier(body, {"X-Spavik-Signature": signature}, "fixture")["event"] == "model.trained"
+body = b'{"type":"model.trained"}'
+stamp = int(time.time())
+signature = hmac.new(b"fixture", f"{stamp}.".encode() + body, hashlib.sha256).hexdigest()
+assert verifier(body, {"Spavik-Signature": f"t={stamp},v1={signature}"}, "fixture")["type"] == "model.trained"
 try:
     verifier(body, {}, "fixture")
 except SpavikSignatureError:

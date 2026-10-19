@@ -11,7 +11,7 @@ import hashlib
 import hmac
 import json
 import time
-from typing import Any, Dict, Mapping, Optional, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 from .errors import SpavikError
 
@@ -22,12 +22,28 @@ class SpavikSignatureError(SpavikError):
     """La signature ne correspond pas, ou l'horodatage est trop ancien."""
 
 
-def _entete(entetes: Mapping[str, str], *noms: str) -> Optional[str]:
-    minuscules = {k.lower(): v for k, v in entetes.items()}
-    for nom in noms:
-        if nom.lower() in minuscules:
-            return minuscules[nom.lower()]
+def _entete(entetes: Mapping[str, str], nom: str) -> Optional[str]:
+    for cle, valeur in entetes.items():
+        if cle.lower() == nom.lower():
+            return valeur
     return None
+
+
+def _lire_signature(valeur: str) -> Tuple[int, List[str]]:
+    """Decoupe `t=<secondes>,v1=<hex>` ; plusieurs v1 restent possibles."""
+    horodatage: Optional[int] = None
+    signatures: List[str] = []
+    for morceau in valeur.split(","):
+        cle, _, contenu = morceau.strip().partition("=")
+        if cle == "t" and contenu.isdigit():
+            horodatage = int(contenu)
+        elif cle == "v1" and contenu:
+            signatures.append(contenu.lower())
+    if horodatage is None or not signatures:
+        raise SpavikSignatureError(
+            "unreadable Spavik-Signature header, expected t=<unix seconds>,v1=<hex>."
+        )
+    return horodatage, signatures
 
 
 def verifier(
@@ -39,38 +55,31 @@ def verifier(
 ) -> Dict[str, Any]:
     """Verifie la signature et rend l'evenement decode.
 
-    `corps` doit etre les octets recus tels quels. Un corps deja parse puis
-    reserialise ne redonne pas la meme signature.
+    L'API envoie `Spavik-Signature: t=<secondes>,v1=<hex>` et signe
+    `<t>.` suivi des octets bruts. `corps` doit etre ces octets tels que recus :
+    un corps deja parse puis reserialise ne redonne pas la meme signature.
     """
     if isinstance(corps, str):
         octets = corps.encode("utf-8")
     else:
         octets = bytes(corps)
 
-    signature = _entete(entetes, "X-Spavik-Signature", "X-Signature")
-    if not signature:
-        raise SpavikSignatureError("no signature header on the request.")
-    horodatage = _entete(entetes, "X-Spavik-Timestamp", "X-Timestamp")
+    entete = _entete(entetes, "Spavik-Signature")
+    if not entete:
+        raise SpavikSignatureError("no Spavik-Signature header on the request.")
+    emis, fournies = _lire_signature(entete)
 
-    if horodatage:
-        try:
-            emis = int(horodatage)
-        except ValueError as exc:
-            raise SpavikSignatureError(f"unreadable timestamp: {horodatage!r}") from exc
-        ecart = abs(int(time.time()) - emis)
-        if ecart > tolerance:
-            raise SpavikSignatureError(
-                f"timestamp is {ecart} s old, beyond the {tolerance} s tolerance. "
-                "Likely a replay."
-            )
-        charge = f"{emis}.".encode("utf-8") + octets
-    else:
-        charge = octets
+    ecart = abs(int(time.time()) - emis)
+    if ecart > tolerance:
+        raise SpavikSignatureError(
+            f"timestamp is {ecart} s old, beyond the {tolerance} s tolerance. "
+            "Likely a replay."
+        )
 
+    charge = f"{emis}.".encode("utf-8") + octets
     attendue = hmac.new(secret.encode("utf-8"), charge, hashlib.sha256).hexdigest()
-    fournie = signature.split("=", 1)[-1].strip()
 
-    if not hmac.compare_digest(attendue, fournie):
+    if not any(hmac.compare_digest(attendue, fournie) for fournie in fournies):
         raise SpavikSignatureError(
             "invalid signature. Check that the body is the raw bytes as received, "
             "not re-serialised, and that the secret is the calling webhook's."

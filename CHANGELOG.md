@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Verify webhooks against the `Spavik-Signature: t=<unix seconds>,v1=<hex>` header
+  sent by the API, signing `<t>.` followed by the raw body. The timestamp is now
+  required and checked against the tolerance; the former `X-Spavik-Signature`
+  and `X-Spavik-Timestamp` headers are no longer read, so no real delivery could
+  pass verification before this fix.
+
 - Require non-empty `features` and `actual` for every outcome, regardless of
   data policy. `request_id` is optional correlation metadata. Inference archival
   policy does not change validation, performance or idempotent response replay.
