@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Breaking: the public API is in English. `Resultat` is now `Result` and
+  `Prevision` is now `Forecast`. Result fields are `data`, `cost` and
+  `predictions_remaining` (formerly `donnees`, `cout` and `solde`).
+  `Prediction.lignes` is now `Prediction.predictions`, `Forecast.cible` is
+  `Forecast.target`, `Model.donnees` is `Model.data`, and
+  `spavik.webhooks.verifier(corps, entetes, secret)` is
+  `verify(body, headers, secret)`, also exported from `spavik`.
+- `predictions_remaining` comes only from the `X-Spavik-Predictions-Remaining`
+  header, the only place the API reports it. Response bodies were searched for
+  `credits_remaining`, `balance` and similar fields that the API never sends.
+- Remove `SpavikCreditsExhausted.balance` and `.required`: API errors carry
+  only `status`, `message` and `messageDetail`, so both were always None.
+  Read `usage()` for the remaining balance.
+- Debug log lines read `key=` and `attempt` instead of French labels.
+
 - Verify webhooks against the `Spavik-Signature: t=<unix seconds>,v1=<hex>` header
   sent by the API, signing `<t>.` followed by the raw body. The timestamp is now
   required and checked against the tolerance; the former `X-Spavik-Signature`

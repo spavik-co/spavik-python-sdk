@@ -9,7 +9,7 @@ import time
 
 import pytest
 
-from spavik.webhooks import SpavikSignatureError, verifier
+from spavik.webhooks import SpavikSignatureError, verify
 
 SECRET = "whsec_de_test"
 
@@ -32,41 +32,41 @@ EVENEMENT = {
 
 def test_signature_valide_rend_l_evenement():
     corps = json.dumps(EVENEMENT).encode()
-    evenement = verifier(corps, signer(corps), SECRET)
+    evenement = verify(corps, signer(corps), SECRET)
     assert evenement["type"] == "model.trained"
     assert evenement["id"] == "evt_1"
 
 
 def test_corps_texte_accepte():
     corps = json.dumps(EVENEMENT)
-    assert verifier(corps, signer(corps.encode()), SECRET)["type"] == "model.trained"
+    assert verify(corps, signer(corps.encode()), SECRET)["type"] == "model.trained"
 
 
 def test_nom_d_entete_insensible_a_la_casse():
     corps = b'{"type":"credits.low"}'
     entetes = {"spavik-signature": signer(corps)["Spavik-Signature"]}
-    assert verifier(corps, entetes, SECRET)["type"] == "credits.low"
+    assert verify(corps, entetes, SECRET)["type"] == "credits.low"
 
 
 def test_signature_invalide():
     corps = b'{"type":"model.trained"}'
     entetes = {"Spavik-Signature": f"t={int(time.time())},v1={'0' * 64}"}
     with pytest.raises(SpavikSignatureError) as exc:
-        verifier(corps, entetes, SECRET)
+        verify(corps, entetes, SECRET)
     assert "invalid signature" in str(exc.value)
 
 
 def test_mauvais_secret():
     corps = b'{"type":"model.trained"}'
     with pytest.raises(SpavikSignatureError):
-        verifier(corps, signer(corps), "un-autre-secret")
+        verify(corps, signer(corps), "un-autre-secret")
 
 
 def test_corps_modifie_apres_signature():
     corps = b'{"type":"model.trained","credits":10}'
     entetes = signer(corps)
     with pytest.raises(SpavikSignatureError):
-        verifier(b'{"type":"model.trained","credits":9999}', entetes, SECRET)
+        verify(b'{"type":"model.trained","credits":9999}', entetes, SECRET)
 
 
 def test_horodatage_signe_avec_le_corps():
@@ -74,13 +74,13 @@ def test_horodatage_signe_avec_le_corps():
     t = int(time.time())
     signature = signer(corps, t)["Spavik-Signature"].split(",v1=")[1]
     with pytest.raises(SpavikSignatureError):
-        verifier(corps, {"Spavik-Signature": f"t={t - 1},v1={signature}"}, SECRET)
+        verify(corps, {"Spavik-Signature": f"t={t - 1},v1={signature}"}, SECRET)
 
 
 def test_rejeu_hors_tolerance():
     corps = b'{"type":"model.trained"}'
     with pytest.raises(SpavikSignatureError) as exc:
-        verifier(corps, signer(corps, int(time.time()) - 3600), SECRET)
+        verify(corps, signer(corps, int(time.time()) - 3600), SECRET)
     assert "Likely a replay" in str(exc.value)
 
 
@@ -88,7 +88,7 @@ def test_horodatage_obligatoire():
     corps = b'{"type":"model.trained"}'
     signature = hmac.new(SECRET.encode(), corps, hashlib.sha256).hexdigest()
     with pytest.raises(SpavikSignatureError) as exc:
-        verifier(corps, {"Spavik-Signature": f"v1={signature}"}, SECRET)
+        verify(corps, {"Spavik-Signature": f"v1={signature}"}, SECRET)
     assert "unreadable Spavik-Signature" in str(exc.value)
 
 
@@ -96,13 +96,13 @@ def test_ancien_entete_refuse():
     corps = b'{"type":"model.trained"}'
     signature = hmac.new(SECRET.encode(), corps, hashlib.sha256).hexdigest()
     with pytest.raises(SpavikSignatureError) as exc:
-        verifier(corps, {"X-Spavik-Signature": signature}, SECRET)
+        verify(corps, {"X-Spavik-Signature": signature}, SECRET)
     assert "no Spavik-Signature header" in str(exc.value)
 
 
 def test_entete_de_signature_absent():
     with pytest.raises(SpavikSignatureError) as exc:
-        verifier(b"{}", {}, SECRET)
+        verify(b"{}", {}, SECRET)
     assert "no Spavik-Signature header" in str(exc.value)
 
 
@@ -111,4 +111,4 @@ def test_une_des_signatures_v1_suffit():
     t = int(time.time())
     bonne = signer(corps, t)["Spavik-Signature"].split(",v1=")[1]
     entetes = {"Spavik-Signature": f"t={t},v1={'0' * 64},v1={bonne}"}
-    assert verifier(corps, entetes, SECRET)["type"] == "model.trained"
+    assert verify(corps, entetes, SECRET)["type"] == "model.trained"

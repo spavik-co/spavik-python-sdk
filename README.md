@@ -45,14 +45,14 @@ with Spavik() as client:
 
     # Predict for a new customer using the same input columns. This consumes credits.
     result = model.predict({"plan": "pro", "seats": 12, "tickets_90d": 2})
-    print(result.lignes)
+    print(result.predictions)
 ```
 
 ```sh
 python quickstart.py
 ```
 
-`result.lignes` contains the predictions returned by the API. Reuse the trained
+`result.predictions` contains the predictions returned by the API. Reuse the trained
 model for subsequent predictions; you do not need to train for every request.
 
 ## Timeouts and uncertain results

@@ -28,14 +28,14 @@ def test_le_request_id_remonte_dans_l_exception(spavik, api, churn):
     assert "req_abc123" in str(exc.value)
 
 
-def test_credits_epuises_porte_le_solde(spavik, api, churn):
+def test_credits_epuises(spavik, api, churn):
+    """L'erreur porte le code et la phrase de l'API, rien d'autre : le solde se lit par usage()."""
     modele = spavik.train(churn, target="churn")
     api.solde = 2
     with pytest.raises(SpavikCreditsExhausted) as exc:
         modele.predict([{"plan": "pro"}] * 5)
-    assert exc.value.balance == 2
-    assert exc.value.required == 5
     assert exc.value.code == "CREDITS_EXHAUSTED"
+    assert not hasattr(exc.value, "balance")
 
 
 def test_reponse_html_ne_leve_pas_une_erreur_de_decodage(spavik, api, churn):
@@ -101,7 +101,7 @@ def test_une_prediction_rejouee_ne_debite_pas_deux_fois(spavik, api, churn):
     depart = api.solde
     api.repondra(f"/v1/models/{modele.id}/predict", _erreur(503, "ENGINE_UNAVAILABLE"))
     resultat = modele.predict([{"plan": "pro"}] * 4)
-    assert resultat.cout is None
+    assert resultat.cost is None
     assert depart - api.solde == 4
 
 

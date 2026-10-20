@@ -72,12 +72,7 @@ class SpavikAuthError(SpavikError):
 
 
 class SpavikCreditsExhausted(SpavikError):
-    """Le solde ne couvre pas l'appel demande."""
-
-    def __init__(self, message: str, **kw: Any) -> None:
-        super().__init__(message, **kw)
-        self.balance = self.payload.get("balance")
-        self.required = self.payload.get("required")
+    """Le solde ne couvre pas l'appel demande. GET /v1/usage dit ce qu'il reste."""
 
 
 class SpavikQuotaExceeded(SpavikError):

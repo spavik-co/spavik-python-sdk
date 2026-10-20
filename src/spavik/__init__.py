@@ -18,10 +18,10 @@ from ._contract import API_VERSION, OPERATIONS
 from .client import (
     AsyncModel,
     AsyncSpavik,
+    Forecast,
     Model,
     Prediction,
-    Prevision,
-    Resultat,
+    Result,
     Spavik,
 )
 from .errors import (
@@ -38,14 +38,14 @@ from .errors import (
     SpavikUnavailable,
     SpavikValidationError,
 )
-from .webhooks import SpavikSignatureError
+from .webhooks import SpavikSignatureError, verify
 
 __all__ = [
     "__version__", "API_VERSION", "OPERATIONS",
     "Spavik", "AsyncSpavik", "Model", "AsyncModel",
-    "Resultat", "Prediction", "Prevision",
+    "Result", "Prediction", "Forecast",
     "SpavikError", "SpavikDataError", "SpavikTransportError", "SpavikAuthError",
     "SpavikCreditsExhausted", "SpavikQuotaExceeded", "SpavikValidationError",
     "SpavikNotFound", "SpavikConflict", "SpavikRateLimited", "SpavikUnavailable",
-    "SpavikServerError", "SpavikSignatureError",
+    "SpavikServerError", "SpavikSignatureError", "verify",
 ]

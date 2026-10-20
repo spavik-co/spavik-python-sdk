@@ -55,15 +55,15 @@ async def test_wire_contract_and_diagnostics(asynchronous):
         result = await resolve(model.predict([{"x": 1}], engine_version="presage-latest"))
         assert json.loads(calls[-1].content) == {"rows": [{"x": 1}], "engine_version": "presage-latest"}
         assert result.version == 7 and result.engine == "presage-2"
-        assert result.request_id == "req_http_current" and result.lignes[0]["request_id"] == "req_prediction_original"
-        assert result.cout is None and result.solde == 80
+        assert result.request_id == "req_http_current" and result.predictions[0]["request_id"] == "req_prediction_original"
+        assert result.cost is None and result.predictions_remaining == 80
         for method in ["forecast", "backtest"]:
             options = dict(target="y", horizon=2, engine_family="presage", engine_version="presage-2", include_backtest_predictions=True)
             if method == "forecast": options["backtest"] = True
             result = await resolve(getattr(client, method)(ROWS, **options))
             sent = json.loads(calls[-1].content)
             assert sent == {"data": ROWS, **options}
-            data = result.donnees if method == "forecast" else result
+            data = result.data if method == "forecast" else result
             assert data["backtest"]["predictions"] == POINTS
         report = await resolve(client.evaluate(ROWS, target="y", engine_family="presage"))
         assert report["trial"]["calibration"] == CALIBRATION

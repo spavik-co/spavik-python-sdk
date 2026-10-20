@@ -28,44 +28,50 @@ from ._http import Requete, _Base, interpreter, tracer
 # --------------------------------------------------------------------------
 
 @dataclass
-class Resultat:
-    """Ce que rend un appel : les donnees brutes, et ce qui aide a s'y retrouver."""
+class Result:
+    """Ce que rend un appel : les donnees brutes, et ce qui aide a s'y retrouver.
 
-    donnees: Dict[str, Any] = field(default_factory=dict)
-    cout: Optional[int] = 0
-    solde: Optional[int] = None
+    `cost` vaut 0 pour une operation gratuite et None pour une operation
+    facturee : l'API ne rend pas le montant debite. `predictions_remaining`
+    recopie l'en-tete X-Spavik-Predictions-Remaining (allocation mensuelle
+    restante plus solde) ; None quand l'API ne l'envoie pas.
+    """
+
+    data: Dict[str, Any] = field(default_factory=dict)
+    cost: Optional[int] = 0
+    predictions_remaining: Optional[int] = None
     request_id: Optional[str] = None
 
     @property
     def training_calibration(self) -> Optional[Dict[str, Any]]:
         """Initial test-set diagnostic returned by the performance API."""
-        return self.donnees.get("training_calibration")
+        return self.data.get("training_calibration")
 
     @property
     def engine(self) -> Optional[str]:
         """Exact serving engine, distinct from the model data version."""
-        return self.donnees.get("_engine_version") or self.donnees.get("engine")
+        return self.data.get("_engine_version") or self.data.get("engine")
 
-    def __getitem__(self, cle: str) -> Any:
-        return self.donnees[cle]
+    def __getitem__(self, key: str) -> Any:
+        return self.data[key]
 
-    def get(self, cle: str, defaut: Any = None) -> Any:
-        return self.donnees.get(cle, defaut)
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.data.get(key, default)
 
 
 @dataclass
-class Prediction(Resultat):
+class Prediction(Result):
     @property
-    def lignes(self) -> List[Dict[str, Any]]:
-        return self.donnees.get("predictions", [])
+    def predictions(self) -> List[Dict[str, Any]]:
+        return self.data.get("predictions", [])
 
     @property
     def version(self) -> Optional[int]:
-        return self.donnees.get("version")
+        return self.data.get("version")
 
 
 @dataclass
-class Prevision(Resultat):
+class Forecast(Result):
     """L'API rend la prevision en CSV. La bibliotheque la rend en lignes.
 
     Le CSV brut reste accessible par `.csv`, pour qui veut l'ecrire tel quel
@@ -74,48 +80,38 @@ class Prevision(Resultat):
 
     @property
     def csv(self) -> str:
-        return self.donnees.get("forecast_csv") or ""
+        return self.data.get("forecast_csv") or ""
 
     @property
     def points(self) -> List[Dict[str, Any]]:
         brut = self.csv
         if not brut.strip():
-            return self.donnees.get("forecast") or self.donnees.get("predictions") or []
+            return self.data.get("forecast") or self.data.get("predictions") or []
         return _data.normaliser(brut, quoi="forecast")
 
     @property
-    def cible(self) -> Optional[str]:
-        return self.donnees.get("target")
+    def target(self) -> Optional[str]:
+        return self.data.get("target")
 
     @property
     def horizon(self) -> Optional[int]:
-        return self.donnees.get("prediction_length")
+        return self.data.get("prediction_length")
 
     @property
     def series(self) -> Optional[int]:
-        return self.donnees.get("n_series")
+        return self.data.get("n_series")
 
 
-def _solde(brut: Mapping[str, Any]) -> Optional[int]:
-    """Le solde voyage avec la reponse quand l'API le rend, sous l'un de ces noms."""
-    for cle in ("credits_remaining", "balance", "credit_balance", "credits"):
-        valeur = brut.get(cle)
-        if isinstance(valeur, int):
-            return valeur
-    facturation = brut.get("billing")
-    if isinstance(facturation, Mapping):
-        for cle in ("credits_remaining", "balance", "credit_balance"):
-            valeur = facturation.get(cle)
-            if isinstance(valeur, int):
-                return valeur
-    # Sinon l'en-tete X-Spavik-Predictions-Remaining, recopie par _http.
+def _reste(brut: Mapping[str, Any]) -> Optional[int]:
+    """L'en-tete X-Spavik-Predictions-Remaining, recopie par _http. L'API ne
+    met pas le solde dans le corps."""
     valeur = brut.get("_predictions_remaining")
     return valeur if isinstance(valeur, int) else None
 
 
-def _resultat(brut: Optional[Dict[str, Any]], cout: Optional[int], classe: type = Resultat) -> Any:
+def _resultat(brut: Optional[Dict[str, Any]], cout: Optional[int], classe: type = Result) -> Any:
     brut = brut or {}
-    return classe(donnees=brut, cout=cout, solde=_solde(brut),
+    return classe(data=brut, cost=cout, predictions_remaining=_reste(brut),
                   request_id=brut.get("_request_id"))
 
 
@@ -167,7 +163,7 @@ class _ModelBase:
         return self._donnees.get("task")
 
     @property
-    def donnees(self) -> Dict[str, Any]:
+    def data(self) -> Dict[str, Any]:
         return dict(self._donnees)
 
     def __repr__(self) -> str:
@@ -203,12 +199,12 @@ class Model(_ModelBase):
         plan = _ops.predict(self.id, rows, engine_version=engine_version)
         return _resultat(self._client._envoyer(plan.requete), None, Prediction)
 
-    def submit_outcomes(self, outcomes: Any) -> Resultat:
+    def submit_outcomes(self, outcomes: Any) -> Result:
         """Report observed outcomes. Every outcome requires features and actual. Free."""
         plan = _ops.submit_outcomes(self.id, outcomes)
         return _resultat(self._client._envoyer(plan.requete), 0)
 
-    def refresh(self) -> Optional[Resultat]:
+    def refresh(self) -> Optional[Result]:
         """Integre les verites en attente et produit une version.
 
         Rend `None` quand il n'y a rien a integrer : c'est un etat normal, pas
@@ -231,7 +227,7 @@ class Model(_ModelBase):
         """Remet en service un modele archive. Il reprend une place du quota. Gratuit."""
         self._client._envoyer(_ops.restore(self.id).requete)
 
-    def performance(self, days: int = 30) -> Optional[Resultat]:
+    def performance(self, days: int = 30) -> Optional[Result]:
         """Observed performance and training calibration; API failures are raised."""
         plan = _ops.performance(self.id, days)
         return _resultat(self._client._envoyer(plan.requete), 0)
@@ -248,11 +244,11 @@ class AsyncModel(_ModelBase):
         plan = _ops.predict(self.id, rows, engine_version=engine_version)
         return _resultat(await self._client._envoyer(plan.requete), None, Prediction)
 
-    async def submit_outcomes(self, outcomes: Any) -> Resultat:
+    async def submit_outcomes(self, outcomes: Any) -> Result:
         plan = _ops.submit_outcomes(self.id, outcomes)
         return _resultat(await self._client._envoyer(plan.requete), 0)
 
-    async def refresh(self) -> Optional[Resultat]:
+    async def refresh(self) -> Optional[Result]:
         plan = _ops.refresh(self.id)
         try:
             return _resultat(await self._client._envoyer(plan.requete), 0)
@@ -269,7 +265,7 @@ class AsyncModel(_ModelBase):
         """Voir Model.restore. Gratuit."""
         await self._client._envoyer(_ops.restore(self.id).requete)
 
-    async def performance(self, days: int = 30) -> Optional[Resultat]:
+    async def performance(self, days: int = 30) -> Optional[Result]:
         plan = _ops.performance(self.id, days)
         return _resultat(await self._client._envoyer(plan.requete), 0)
 
@@ -383,10 +379,10 @@ class Spavik(_Base):
         brut = self._envoyer(plan.requete) or {}
         return self._modele(self, _model_data(brut))
 
-    def forecast(self, data: Any, **kw: Any) -> Prevision:
+    def forecast(self, data: Any, **kw: Any) -> Forecast:
         """Forecast time series. Billed by the API at horizon times the serving engine tariff, all series included."""
         plan = _ops.forecast(data, **kw)
-        return _resultat(self._envoyer(plan.requete), plan.cout, Prevision)
+        return _resultat(self._envoyer(plan.requete), plan.cout, Forecast)
 
     def models(self, *, limit: int = 50, status: Optional[str] = None) -> Iterator[Model]:
         """Parcourt les modeles du workspace, page par page, sans y penser.
@@ -521,9 +517,9 @@ class AsyncSpavik(_Base):
         brut = await self._envoyer(plan.requete) or {}
         return self._modele(self, _model_data(brut))
 
-    async def forecast(self, data: Any, **kw: Any) -> Prevision:
+    async def forecast(self, data: Any, **kw: Any) -> Forecast:
         plan = _ops.forecast(data, **kw)
-        return _resultat(await self._envoyer(plan.requete), plan.cout, Prevision)
+        return _resultat(await self._envoyer(plan.requete), plan.cout, Forecast)
 
     async def archive(self, model_id: str) -> None:
         """Voir Spavik.archive."""

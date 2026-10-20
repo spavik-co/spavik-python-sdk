@@ -123,8 +123,7 @@ class ApiSimulee:
                                  "latest_version": 1, "task": "classification", "engine_family": family, "engine": family + "-2"}
             return self._json(201, {"model": self.modeles[mid],
                                     "version": {"version": 1, "id": "ver_1"},
-                                    "validation": {"row_count": len(corps.get("data") or [])},
-                                    "credits_remaining": self.solde})
+                                    "validation": {"row_count": len(corps.get("data") or [])}})
 
         if chemin == "/v1/models" and requete.method == "GET":
             limite = int(requete.url.params.get("limit", 50))
@@ -142,15 +141,13 @@ class ApiSimulee:
             cout = len(lignes)
             if cout > self.solde:
                 return self._json(402, {"status": "error", "message": "CREDITS_EXHAUSTED",
-                                        "messageDetail": "Not enough credits.",
-                                        "balance": self.solde, "required": cout})
+                                        "messageDetail": "Not enough credits."})
             self.solde -= cout
             self._scores += cout
             return self._json(200, {
                 "model_id": chemin.split("/")[3], "version": 1, "n_scored": cout,
                 "predictions": [{"request_id": f"req_p{self._scores - cout + i:04d}", "prediction": 1,
-                                 "proba_0": 0.2, "proba_1": 0.8} for i in range(cout)],
-                "credits_remaining": self.solde},
+                                 "proba_0": 0.2, "proba_1": 0.8} for i in range(cout)]},
                 {"X-Spavik-Predictions-Remaining": str(self.solde)})
 
         if chemin.endswith("/outcomes"):
@@ -182,8 +179,7 @@ class ApiSimulee:
             horizon = corps.get("horizon") or 1
             if horizon > self.solde:
                 return self._json(402, {"status": "error", "message": "CREDITS_EXHAUSTED",
-                                        "messageDetail": "Not enough credits.",
-                                        "balance": self.solde})
+                                        "messageDetail": "Not enough credits."})
             self.solde -= horizon
             cible = corps.get("target") or "valeur"
             lignes = [f"date,{cible}_prediction"]

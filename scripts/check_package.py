@@ -35,7 +35,7 @@ from pathlib import Path
 import httpx
 import spavik
 from spavik import Spavik, AsyncSpavik, SpavikSignatureError
-from spavik.webhooks import verifier
+from spavik.webhooks import verify
 
 assert Path(spavik.__file__).resolve().is_relative_to((Path(__file__).parent / "venv").resolve())
 calls = []
@@ -58,9 +58,9 @@ assert len(calls) == 2
 body = b'{"type":"model.trained"}'
 stamp = int(time.time())
 signature = hmac.new(b"fixture", f"{stamp}.".encode() + body, hashlib.sha256).hexdigest()
-assert verifier(body, {"Spavik-Signature": f"t={stamp},v1={signature}"}, "fixture")["type"] == "model.trained"
+assert verify(body, {"Spavik-Signature": f"t={stamp},v1={signature}"}, "fixture")["type"] == "model.trained"
 try:
-    verifier(body, {}, "fixture")
+    verify(body, {}, "fixture")
 except SpavikSignatureError:
     pass
 else:

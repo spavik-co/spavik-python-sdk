@@ -155,14 +155,14 @@ def tracer(requete: Requete, statut: Optional[int], duree: float, rid: Optional[
     if not _LOG.isEnabledFor(logging.DEBUG):
         return
     _LOG.debug(
-        "%s %s  idem=%s  %.2fs  %s  %s%s  cle=%s",
+        "%s %s  idem=%s  %.2fs  %s  %s%s  key=%s",
         requete.methode,
         requete.chemin,
         (requete.idempotence or "-")[:8],
         duree,
-        statut if statut is not None else "reseau",
+        statut if statut is not None else "network",
         rid or "-",
-        f"  tentative {tentative}" if tentative > 1 else "",
+        f"  attempt {tentative}" if tentative > 1 else "",
         masquer(cle_api),
     )
 

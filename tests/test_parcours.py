@@ -14,9 +14,9 @@ def test_boucle_complete(spavik, api, churn):
 
     depart = api.solde
     prediction = modele.predict([{"plan": "pro", "seats": 12, "tickets_90d": 3}])
-    assert prediction.cout is None
-    assert prediction.solde == depart - 1
-    assert len(prediction.lignes) == 1
+    assert prediction.cost is None
+    assert prediction.predictions_remaining == depart - 1
+    assert len(prediction.predictions) == 1
     assert prediction.request_id
 
     verites = modele.submit_outcomes([
@@ -25,7 +25,7 @@ def test_boucle_complete(spavik, api, churn):
         {"request_id": "req_3", "features": {"plan": "pro", "seats": 12, "tickets_90d": 3}, "actual": 1},
     ])
     assert verites["accepted"] == 3
-    assert verites.cout == 0
+    assert verites.cost == 0
 
     integration = modele.refresh()
     assert integration is not None
@@ -55,7 +55,7 @@ def test_prevision_et_cout(spavik, api):
     serie = [{"date": f"2026-07-{i+1:02d}", "ventes": 100 + i} for i in range(28)]
     depart = api.solde
     resultat = spavik.forecast(serie, target="ventes", horizon=7)
-    assert resultat.cout is None
+    assert resultat.cost is None
     assert len(resultat.points) == 7
     assert depart - api.solde == 7
 
@@ -65,7 +65,7 @@ def test_prevision_multi_series(spavik, api):
     api.solde = 7
     assert api.appels == []
     result = spavik.forecast(serie, target="ventes", horizon=7, item_id="boutique")
-    assert result.cout is None
+    assert result.cost is None
     assert api.solde == 0
 
 
@@ -75,7 +75,7 @@ async def test_prevision_multi_series_asynchrone(aspavik, api):
     api.solde = 7
     assert api.appels == []
     result = await aspavik.forecast(serie, target="ventes", horizon=7, item_id="boutique")
-    assert result.cout is None
+    assert result.cost is None
     assert api.solde == 0
 
 
@@ -85,8 +85,8 @@ async def test_asynchrone_donne_le_meme_resultat(aspavik, api, churn):
     assert modele.id.startswith("mdl_")
 
     prediction = await modele.predict([{"plan": "pro"}])
-    assert prediction.cout is None
-    assert len(prediction.lignes) == 1
+    assert prediction.cost is None
+    assert len(prediction.predictions) == 1
 
     await modele.submit_outcomes([{"request_id": "req_1", "features": {"plan": "pro", "seats": 12, "tickets_90d": 3}, "actual": 1}])
     integration = await modele.refresh()
@@ -142,7 +142,7 @@ def test_prediction_cost_is_not_invented_from_the_catalogue(spavik, api, churn):
     api.modeles[model.id]["engine"] = "big-v1"   # servi par un moteur a trois credits
     model = spavik.model(model.id)
     assert model.engine == "big-v1"
-    assert model.predict([{"plan": "pro"}] * 4).cout is None
+    assert model.predict([{"plan": "pro"}] * 4).cost is None
     assert api.compte("/v1/engines") == 0, "le catalogue se lit une fois"
 
 
@@ -163,11 +163,11 @@ async def test_usage_asynchrone(aspavik, api):
     await aspavik.aclose()
 
 
-def test_le_solde_vient_de_l_en_tete_quand_le_corps_ne_l_a_pas(spavik, api):
-    """forecast ne rend pas le solde dans son corps : X-Spavik-Predictions-Remaining le donne."""
+def test_le_reste_vient_de_l_en_tete(spavik, api):
+    """L'API ne met pas le reste dans le corps : X-Spavik-Predictions-Remaining le donne."""
     serie = [{"date": f"2026-07-{i+1:02d}", "ventes": 100 + i} for i in range(28)]
     r = spavik.forecast(serie, target="ventes", horizon=3)
-    assert r.solde == api.solde == 97
+    assert r.predictions_remaining == api.solde == 97
 
 
 def test_archiver_puis_restaurer(spavik, api, churn):
@@ -221,7 +221,7 @@ def test_les_archives_se_listent_a_part(spavik, api, churn):
 def test_la_reponse_de_prediction_porte_les_request_id(spavik, api, churn):
     model = spavik.train(churn, target="churn")
     r = model.predict([{"plan": "pro"}] * 3)
-    assert [l["request_id"] for l in r.lignes] == ["req_p0000", "req_p0001", "req_p0002"]
+    assert [l["request_id"] for l in r.predictions] == ["req_p0000", "req_p0001", "req_p0002"]
 
 
 async def test_restaurer_asynchrone_par_identifiant(aspavik, api, churn):

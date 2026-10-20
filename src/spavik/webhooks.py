@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 from .errors import SpavikError
 
-TOLERANCE_SECONDES = 300
+TOLERANCE_SECONDS = 300
 
 
 class SpavikSignatureError(SpavikError):
@@ -46,25 +46,25 @@ def _lire_signature(valeur: str) -> Tuple[int, List[str]]:
     return horodatage, signatures
 
 
-def verifier(
-    corps: Union[str, bytes],
-    entetes: Mapping[str, str],
+def verify(
+    body: Union[str, bytes],
+    headers: Mapping[str, str],
     secret: str,
     *,
-    tolerance: int = TOLERANCE_SECONDES,
+    tolerance: int = TOLERANCE_SECONDS,
 ) -> Dict[str, Any]:
     """Verifie la signature et rend l'evenement decode.
 
     L'API envoie `Spavik-Signature: t=<secondes>,v1=<hex>` et signe
-    `<t>.` suivi des octets bruts. `corps` doit etre ces octets tels que recus :
+    `<t>.` suivi des octets bruts. `body` doit etre ces octets tels que recus :
     un corps deja parse puis reserialise ne redonne pas la meme signature.
     """
-    if isinstance(corps, str):
-        octets = corps.encode("utf-8")
+    if isinstance(body, str):
+        octets = body.encode("utf-8")
     else:
-        octets = bytes(corps)
+        octets = bytes(body)
 
-    entete = _entete(entetes, "Spavik-Signature")
+    entete = _entete(headers, "Spavik-Signature")
     if not entete:
         raise SpavikSignatureError("no Spavik-Signature header on the request.")
     emis, fournies = _lire_signature(entete)
