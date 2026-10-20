@@ -11,6 +11,7 @@ import csv
 import io
 import json
 import os
+import re
 from typing import Any, Dict, Iterable, List, Sequence
 
 from .errors import SpavikDataError
@@ -61,6 +62,12 @@ def _depuis_json(texte: str, origine: str) -> Lignes:
     return normaliser(contenu, quoi=origine)
 
 
+# Seule l'ecriture decimale ordinaire devient un nombre. Un zero en tete
+# ("007", un code postal) reste du texte, comme "1_000", "nan" ou "inf".
+_ENTIER = re.compile(r"-?(0|[1-9][0-9]*)")
+_DECIMAL = re.compile(r"-?(0|[1-9][0-9]*)?\.[0-9]+([eE][-+]?[0-9]+)?")
+
+
 def _typer(valeur: Any) -> Any:
     """Un CSV ne porte que du texte. Les nombres redeviennent des nombres."""
     if not isinstance(valeur, str):
@@ -68,14 +75,11 @@ def _typer(valeur: Any) -> Any:
     brut = valeur.strip()
     if brut == "":
         return None
-    try:
+    if _ENTIER.fullmatch(brut):
         return int(brut)
-    except ValueError:
-        pass
-    try:
+    if _DECIMAL.fullmatch(brut):
         return float(brut)
-    except ValueError:
-        return valeur
+    return valeur
 
 
 def _depuis_dataframe(df: Any) -> Lignes:

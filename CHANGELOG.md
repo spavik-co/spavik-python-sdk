@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep CSV values with a leading zero, such as `007` or a postal code, as text
+  instead of turning them into numbers. Only plain decimal notation becomes a
+  number; `1_000`, `nan` and `inf` stay text.
 - Breaking: the public API is in English. `Resultat` is now `Result` and
   `Prevision` is now `Forecast`. Result fields are `data`, `cost` and
   `predictions_remaining` (formerly `donnees`, `cout` and `solde`).

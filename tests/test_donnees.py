@@ -28,6 +28,11 @@ def test_csv_les_nombres_redeviennent_des_nombres():
     assert lignes == [{"a": 1, "b": 2.5, "c": "texte"}]
 
 
+def test_csv_les_codes_gardent_leurs_zeros():
+    lignes = normaliser("code,n,x,y,z,d\n007,0,1_000,nan,-0.5,.25\n")
+    assert lignes == [{"code": "007", "n": 0, "x": "1_000", "y": "nan", "z": -0.5, "d": 0.25}]
+
+
 def test_csv_point_virgule():
     assert normaliser("a;b\n1;2\n") == [{"a": 1, "b": 2}]
 
