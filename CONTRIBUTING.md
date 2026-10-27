@@ -105,7 +105,7 @@ be fitted on training partitions, never on the complete evaluation dataset.
 
 ## Dependency maintenance
 
-Development requires Python 3.11 or later and uv 0.13.0. Install uv using
+Development requires Python 3.11 or later and uv 0.13.6. Install uv using
 the [official instructions](https://docs.astral.sh/uv/getting-started/installation/).
 `uv sync --locked --all-extras` creates the development environment from
 `uv.lock`; run `uv pip check` and `uv run --locked --all-extras pip-audit --skip-editable`

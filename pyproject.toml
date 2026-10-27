@@ -38,7 +38,7 @@ testpaths = ["tests"]
 dev = ["pip-audit==2.10.1", "hatchling==1.32.4"]
 
 [tool.uv]
-required-version = "==0.13.0"
+required-version = "==0.13.6"
 # Isolated PEP 517 builds use the same reviewed backend and transitives.
 build-constraint-dependencies = [
   "hatchling==1.32.4", "packaging==26.3", "pathspec==1.1.1",
