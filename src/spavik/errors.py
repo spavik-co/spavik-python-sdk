@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping, Optional
 
-from ._contract import FAMILLE_PAR_CODE
+from ._contract import ERROR_FAMILY_BY_CODE
 
 # Un code machine de l'API est en majuscules avec des soulignes. La passerelle,
 # elle, rend ses propres erreurs sous une autre forme :
@@ -134,7 +134,7 @@ _PAR_STATUT = {
 def _classe(code: Optional[str], status: Optional[int]) -> type:
     """La famille du code prime ; le statut sert de repli, y compris sur un code inconnu."""
     if code:
-        famille = FAMILLE_PAR_CODE.get(code)
+        famille = ERROR_FAMILY_BY_CODE.get(code)
         if famille and famille != "hors_perimetre":
             return _PAR_FAMILLE[famille]
     if status is not None:

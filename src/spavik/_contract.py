@@ -4,7 +4,7 @@ from __future__ import annotations
 
 API_VERSION = '1.0.0'
 
-CONTRAT_SOURCE = 'https://test-api.spavik.co'
+CONTRACT_SOURCE = 'https://api.spavik.co'
 
 OPERATIONS = {'train': {'method': 'POST',
            'path': '/v1/models',
@@ -56,7 +56,7 @@ OPERATIONS = {'train': {'method': 'POST',
                  'timeout': 30.0,
                  'idempotency_declared_in_contract': False}}
 
-FAMILLE_PAR_CODE = {'ACCOUNT_NOT_FOUND': 'not_found',
+ERROR_FAMILY_BY_CODE = {'ACCOUNT_NOT_FOUND': 'not_found',
  'ADMIN_KEY_CANNOT_PREDICT': 'auth',
  'API_KEY_EXPIRED': 'auth',
  'API_KEY_INVALID': 'auth',
@@ -135,5 +135,3 @@ FAMILLE_PAR_CODE = {'ACCOUNT_NOT_FOUND': 'not_found',
  'WORKSPACE_NOT_FOUND': 'not_found'}
 
 KEY_PREFIXES = {'api': ['sk-spv-api-'], 'admin': ['sk-spv-admin-']}
-
-HORS_PERIMETRE = frozenset([])

@@ -9,6 +9,6 @@ a complete OpenAPI specification. Historical error mappings remain so older
 responses keep their exception families. They do not grant access to endpoints.
 
 Review changes against the public client contract at
-https://test-api.spavik.co/openapi.json, then regenerate and run the contract
+https://api.spavik.co/openapi.json, then regenerate and run the contract
 check. Do not edit the generated runtime module directly. Tests use the local
 simulated API and never need a production key or a private repository.

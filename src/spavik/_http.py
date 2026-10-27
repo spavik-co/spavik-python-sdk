@@ -27,7 +27,6 @@ from . import errors as _err
 _LOG = logging.getLogger("spavik")
 
 REPRISES_MAX = 3
-BASE_URL_TEST = "https://test-api.spavik.co"
 BASE_URL_DEFAUT = os.environ.get("SPAVIK_BASE_URL") or "https://api.spavik.co"
 
 
