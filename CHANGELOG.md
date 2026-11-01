@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a1
+
+First pre-release on PyPI: `pip install --pre spavik`.
+
 
 - Keep CSV values with a leading zero, such as `007` or a postal code, as text
   instead of turning them into numbers. Only plain decimal notation becomes a

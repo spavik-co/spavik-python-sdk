@@ -11,10 +11,10 @@ Add predictive capabilities to your application without building an ML stack.
 
 Requires Python 3.11 or later.
 
-Development preview: not yet published to PyPI. Install from source:
+Development preview, published as a pre-release:
 
 ```sh
-python -m pip install "git+https://github.com/spavik-co/spavik-python-sdk.git@dev"
+python -m pip install --pre spavik
 ```
 
 ## Get your API key

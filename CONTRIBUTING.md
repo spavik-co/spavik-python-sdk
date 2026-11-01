@@ -6,7 +6,7 @@ customer datasets. Security reports go through [SECURITY.md](SECURITY.md).
 
 ## Install from source
 
-Requires Python 3.11 or newer. Until the first PyPI release:
+Requires Python 3.11 or newer. To try the latest `dev` before it is published:
 
 ```sh
 python -m pip install "git+https://github.com/spavik-co/spavik-python-sdk.git@dev"
