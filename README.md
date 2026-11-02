@@ -11,7 +11,7 @@ Add predictive capabilities to your application without building an ML stack.
 
 Requires Python 3.11 or later.
 
-Development preview, published as a pre-release:
+Early release: the API may change before 1.0. Until a stable version is out, pip needs `--pre`:
 
 ```sh
 python -m pip install --pre spavik
