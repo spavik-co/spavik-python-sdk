@@ -35,7 +35,6 @@ def train(
     target: str,
     engine_family: Optional[str] = None,
     name: Optional[str] = None,
-    explain: Optional[bool] = None,
     auto_update: Optional[bool] = None,
 ) -> Plan:
     lignes = _data.normaliser(data, quoi="training data")
@@ -43,7 +42,7 @@ def train(
 
     corps: Dict[str, Any] = {"target": target, "data": lignes}
     for cle, valeur in (("engine_family", engine_family), ("name", name),
-                        ("explain", explain), ("auto_update", auto_update)):
+                        ("auto_update", auto_update)):
         if valeur is not None:
             corps[cle] = valeur
 
@@ -137,14 +136,17 @@ def list_models(limit: int, offset: int, status: Optional[str] = None) -> Plan:
     ), cout=0)
 
 
-def evaluate(data: Any, *, target: str, engine_family: Optional[str] = None) -> Plan:
+def evaluate(data: Any, *, target: str, engine_family: Optional[str] = None,
+             explain: Optional[bool] = None) -> Plan:
     """Le rapport de validation de l'entrainement et un essai du moteur, sans
     rien creer ni debiter. Aucun controle local : c'est l'API qui juge, et
-    elle dit quoi corriger en premier."""
+    elle dit quoi corriger en premier. explain demande en plus le classement
+    de toutes les colonnes (trial.feature_importance)."""
     lignes = _data.normaliser(data, quoi="data to evaluate")
     corps: Dict[str, Any] = {"target": target, "data": lignes}
-    if engine_family is not None:
-        corps["engine_family"] = engine_family
+    for cle, valeur in (("engine_family", engine_family), ("explain", explain)):
+        if valeur is not None:
+            corps[cle] = valeur
     return Plan(Requete(
         methode="POST", chemin="/v1/datasets/evaluate", operation="evaluate", corps=corps,
         delai=_delai("train"), contexte="data evaluation",

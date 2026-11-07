@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Breaking: `train()` no longer accepts `explain`. Feature importance moves to
+  `evaluate(..., explain=True)`, which ranks every feature column in
+  `trial["feature_importance"]` before any model is created. Measured at
+  training, it multiplied the training time by the number of columns.
+- `TOO_MANY_COLUMNS` is mapped to the quota error family. The API refuses
+  tables with more feature columns than the plan allows
+  (`limits.max_feature_columns`, 30 on public plans, target excluded).
+
 ## 0.1.0a1
 
 First pre-release on PyPI: `pip install --pre spavik`.

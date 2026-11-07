@@ -262,3 +262,13 @@ async def test_evaluer_asynchrone(aspavik, api, churn):
         assert api.solde == 100 and not api.modeles
     finally:
         await aspavik.aclose()
+
+
+def test_l_importance_des_colonnes_se_demande_a_l_evaluation(spavik, api, churn):
+    import json as _json
+    spavik.evaluate(churn, target="churn", explain=True)
+    assert _json.loads(api.appels[-1].content)["explain"] is True
+    spavik.evaluate(churn, target="churn")
+    assert "explain" not in _json.loads(api.appels[-1].content)
+    with pytest.raises(TypeError):
+        spavik.train(churn, target="churn", explain=True)

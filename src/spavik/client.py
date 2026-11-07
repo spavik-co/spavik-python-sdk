@@ -408,7 +408,8 @@ class Spavik(_Base):
         """Ce que l'entrainement dirait de ces donnees, et ce que le moteur en
         fait a l'essai, sans rien creer ni debiter. Rend le rapport de l'API :
         validation, hint, trial et assessment (status, metric, message),
-        transmis sans recalcul ni conclusion de remplacement."""
+        transmis sans recalcul ni conclusion de remplacement. explain=True
+        classe en plus toutes les colonnes dans trial["feature_importance"]."""
         brut = self._envoyer(_ops.evaluate(data, **kw).requete)
         return dict(brut) if isinstance(brut, Mapping) else {}
 
