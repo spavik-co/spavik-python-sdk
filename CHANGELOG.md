@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a2
 
 - Breaking: `train()` no longer accepts `explain`. Feature importance moves to
   `evaluate(..., explain=True)`, which ranks every feature column in
