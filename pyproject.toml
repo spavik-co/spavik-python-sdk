@@ -4,17 +4,25 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spavik"
-version = "0.1.0"
-description = "Python client for the Spavik API: training, prediction, forecasting, feedback loop."
+version = "0.1.1"
+description = "Prediction API for Python apps: create a model from your data in one call, then predict churn, conversions, prices, delivery times or demand. No ML stack to build."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Spavik", email = "admin@spavik.co" }]
-keywords = ["spavik", "prediction", "forecasting", "sdk"]
+keywords = [
+  "spavik", "prediction", "prediction-api", "predictive-analytics", "machine-learning",
+  "automl", "forecasting", "time-series", "churn-prediction", "lead-scoring",
+  "classification", "regression", "tabular-data", "ai-agents", "mcp", "api-client", "sdk",
+]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
+  "Natural Language :: English",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Office/Business",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
@@ -36,6 +44,9 @@ Homepage = "https://spavik.co"
 Documentation = "https://docs.spavik.co/libraries/python"
 Repository = "https://github.com/spavik-co/spavik-python-sdk"
 Issues = "https://github.com/spavik-co/spavik-python-sdk/issues"
+Changelog = "https://github.com/spavik-co/spavik-python-sdk/blob/main/CHANGELOG.md"
+"Use cases" = "https://spavik.co/use-cases"
+Pricing = "https://spavik.co/pricing"
 
 [tool.hatch.build.targets.sdist]
 include = ["/src", "/tests", "/scripts", "/contract", "/examples", "/pyproject.toml", "/README.md", "/LICENSE", "/NOTICE", "/CHANGELOG.md", "/CONTRIBUTING.md", "/SECURITY.md", "/RELEASING.md"]

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+- Documentation only: a new README, shown on PyPI and GitHub, that explains
+  what Spavik predicts before the reference details, with links to the use
+  case guides. Package metadata gains a fuller summary, keywords, topic
+  classifiers and Changelog, Use cases and Pricing links. Development status
+  moves to Beta. No code change.
+
 ## 0.1.0
 
 - Breaking: training needs at least 100 rows, up from 10, as the API now

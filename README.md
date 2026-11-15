@@ -1,182 +1,174 @@
-# Spavik Python SDK
+<p align="center">
+  <a href="https://spavik.co">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://docs.spavik.co/logo-dark.svg">
+      <img src="https://docs.spavik.co/logo-light.svg" alt="Spavik" width="180">
+    </picture>
+  </a>
+</p>
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# Spavik for Python: predictions in your app, without an ML stack
+
+[![PyPI](https://img.shields.io/pypi/v/spavik.svg)](https://pypi.org/project/spavik/)
+[![Python versions](https://img.shields.io/pypi/pyversions/spavik.svg)](https://pypi.org/project/spavik/)
 [![CI](https://github.com/spavik-co/spavik-python-sdk/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/spavik-co/spavik-python-sdk/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/spavik-co/spavik-python-sdk/blob/main/LICENSE)
 
-Prediction infrastructure for developers.
+[Spavik](https://spavik.co) is a prediction API for developers and AI agents.
+You send the history your application already keeps, such as past customers,
+leads, orders or shipments, and Spavik creates a model from it in one call.
+Your code then asks the questions that matter to the business: will this
+customer cancel, will this lead buy, what will this house sell for, how many
+orders will come in tomorrow.
 
-Add predictive capabilities to your application without building an ML stack.
-
-## Install
-
-Requires Python 3.11 or later.
-
-Early release: the API may change before 1.0.
+There is no model to design, host or retrain by hand. This package is the
+official Python client: it handles authentication, retries, safe replays and
+data conversion, so a prediction is a method call.
 
 ```sh
-python -m pip install spavik
+pip install spavik
 ```
 
-## Get your API key
+## A first prediction in five minutes
 
-Create a free account at [spavik.co](https://spavik.co) and generate your API key from the dashboard.
-
-The Free plan includes **100 predictions per calendar month**, reset on the
-1st at 00:00 UTC. No credit card required.
-
-```bash
-export SPAVIK_API_KEY="sk-spv-api-..."
-```
-
-The client reads `SPAVIK_API_KEY`, and `SPAVIK_BASE_URL` when set, at the moment
-it is created. Without a key, every call except the public engine catalogue
-(`engines()`, `engine_families()`) raises `SpavikAuthError` locally, and nothing
-is sent.
-
-## Quickstart
-
-Download [churn.csv](examples/data/churn.csv) and save it in your application's
-working directory. It contains synthetic customer records with `plan`, `seats`,
-`tickets_90d` and the known outcome `churn`. It demonstrates the API, not model quality.
-
-Save this as `quickstart.py` beside the CSV:
+1. Create a free account on [spavik.co](https://spavik.co) and copy your API key
+   from the dashboard. No credit card is required.
+2. Export it: `export SPAVIK_API_KEY="sk-spv-api-..."`
+3. Download [churn.csv](https://github.com/spavik-co/spavik-python-sdk/blob/main/examples/data/churn.csv),
+   120 synthetic customers with their plan, seats, support tickets and whether
+   they cancelled.
+4. Run this script beside the file:
 
 ```python
 from spavik import Spavik
 
-# Read your API key from SPAVIK_API_KEY.
 with Spavik() as client:
-    # Train on historical customers; "churn" is the value to predict. Training is free.
+    # Free: does this table say anything about churn?
+    report = client.evaluate("churn.csv", target="churn")
+    print(report["assessment"]["message"])
+
+    # Free: create a model from the 120 past customers.
     model = client.train("churn.csv", target="churn")
 
-    # Predict for a new customer using the same input columns. This consumes credits.
+    # One credit: will this customer cancel?
     result = model.predict({"plan": "pro", "seats": 12, "tickets_90d": 2})
     print(result.predictions)
 ```
 
-```sh
-python quickstart.py
+Keep `model.id`: the model stays available, and later predictions reuse it
+without training again.
+
+## What you can predict
+
+Anything your history already records the answer to. Each guide below comes
+with a dataset and complete code.
+
+| Question your app asks | Answer | Guide |
+|---|---|---|
+| Will this customer cancel? | yes or no, with a probability | [Churn prediction](https://spavik.co/use-cases/churn-prediction) |
+| Will this lead become a customer? | yes or no, with a probability | [Lead conversion](https://spavik.co/use-cases/lead-conversion-prediction) |
+| What will this property sell for? | a number | [House prices](https://spavik.co/use-cases/house-price-prediction) |
+| How many hours will this parcel take? | a number | [Delivery times](https://spavik.co/use-cases/delivery-time-prediction) |
+| How many orders tomorrow? | the next values of a series | [Order forecast](https://spavik.co/use-cases/order-forecast) |
+| What will tomorrow's peak demand be? | the next values of a series | [Electricity demand](https://spavik.co/use-cases/electricity-demand-forecast) |
+
+Forecasting needs no model at all: send the series and the number of steps.
+
+```python
+forecast = client.forecast("sales.csv", target="sales", horizon=7)
+print(forecast.points)
 ```
 
-`result.predictions` contains the predictions returned by the API. Reuse the trained
-model for subsequent predictions; you do not need to train for every request.
+## How a model lives
 
-Training needs at least 100 rows; with fewer, `train()` raises `SpavikDataError`
-and nothing is sent. 100 rows give a much better chance of a useful result, not
-a guarantee: call `client.evaluate("churn.csv", target="churn")` first, it is
-free and says whether the data can predict that column.
+`evaluate` tells you, for free, whether the data can predict the column you
+chose and how it compares with a simple guess. `train` creates the model, also
+for free. `predict` scores new rows and is, with `forecast`, the only billed
+step. Once the real outcome is known, `model.submit_outcomes(...)` reports it,
+`model.performance()` shows how the predictions held up, and `model.refresh()`
+folds the new examples into the model.
 
-`result.request_id`, `result.predictions_remaining` and `result.engine_version`
-come from the response headers. `result.data` is the response body as the API
-sent it.
+Training needs at least 100 rows, and results are usually limited below 200.
+Reaching that size improves the odds without promising a good model, which is
+why the evaluation comes first.
 
-## Timeouts and uncertain results
+## Plans
 
-`Spavik(timeout=0.25)` and `AsyncSpavik(timeout=0.25)` apply that timeout to
-every request, including retries. It overrides each operation's default.
-Omit `timeout` or pass `None` to keep operation defaults, such as 15 seconds
-for account usage, 120 for training and 60 for forecasting. The timeout applies
-to each [HTTPX network phase](https://www.python-httpx.org/advanced/timeouts/)
-of each attempt, not to the total duration of an operation
-with retries and backoff.
+The Free plan includes 100 predictions per calendar month, reset on the 1st at
+00:00 UTC, and one active model. Training, evaluation and backtests are free on
+every plan. Paid plans and their limits are on the
+[pricing page](https://spavik.co/pricing).
 
-When network retries are exhausted, `SpavikTransportError.idempotency_key`
-preserves the key used for an idempotent request, and `__cause__` retains the
-underlying HTTPX error. A read request has no idempotency key.
-After a timeout, the server may already have executed the request. Do not
-blindly call the mutation again: a new SDK call generates a new key and can
-repeat the operation. To replay safely, pass the same key yourself:
-`train`, `forecast`, `Model.predict`, `Model.submit_outcomes` and
-`Model.refresh` accept `idempotency_key=...`, reused on every retry, so a
-replayed call is not billed twice.
+## Works with your data and your agents
+
+Pass a CSV path, CSV or JSON text, a dict, a list of dicts or a pandas
+DataFrame (`pip install "spavik[pandas]"`). Dates, `Decimal` and missing values
+are converted for you. `AsyncSpavik` offers the same methods for asyncio
+applications.
+
+If you build with an AI agent, the same operations are available as tools from
+the [Spavik MCP server](https://spavik.co/mcp-integration), and a
+[TypeScript SDK](https://www.npmjs.com/package/spavik) covers Node.js and edge
+runtimes.
+
+## Good to know in production
+
+**Configuration.** The client reads `SPAVIK_API_KEY`, and `SPAVIK_BASE_URL`
+when set, at the moment it is created. Without a key, every call except the
+public engine catalogue (`engines()`, `engine_families()`) raises
+`SpavikAuthError` locally and nothing is sent. Python 3.11 or later is required.
+
+**Timeouts.** `Spavik(timeout=...)` replaces every operation's default (15 s
+for account reads, 30 s for predictions, 60 s for forecasts, 120 s for
+training). It applies to each network phase of each attempt, not to the total
+duration of a call with retries.
+
+**Retries and safe replays.** Network errors and temporary API errors are
+retried with backoff. Mutations carry an idempotency key, kept across retries
+and left in `exc.idempotency_key` when retries run out. After a timeout the
+request may have run, so replay it with the same key rather than calling again:
+`train`, `forecast`, `predict`, `submit_outcomes` and `refresh` accept
+`idempotency_key=...`, and a replayed key is not billed twice. A `Retry-After`
+longer than 60 seconds is not waited for: the error is raised at once.
 
 ```python
 model.predict(rows, idempotency_key="order-1234-score")
 ```
 
-When the API asks to wait (`Retry-After`), the client waits up to 60 seconds
-before retrying. A longer wait is not slept through: the error, such as
-`SpavikRateLimited`, is raised at once.
+**Strings that look like files.** A single-line string ending in `.csv`, `.tsv`,
+`.txt` or `.json`, or containing a path separator, is read as a file and its
+content is sent. Never hand the SDK a string that comes from your own users as
+data: pass rows, or a `pathlib.Path` you built yourself.
 
-## Input formats
+**CSV text.** Headers must be unique and non-empty, and lose their surrounding
+spaces. Malformed rows raise `SpavikDataError` with the line number before any
+call. Two edge cases differ from the TypeScript SDK: integers beyond 2^53 stay
+Python integers (TypeScript keeps them as text), and a quote inside an unquoted
+field is accepted (TypeScript refuses the file).
 
-The SDK accepts dictionaries, lists of dictionaries, DataFrames, raw CSV/JSON
-text and file paths. JSON strings containing URLs or paths remain JSON content.
-Use `pathlib.Path` to explicitly identify a file, including filenames that start
-with `[` or `{`, or have no extension.
+**Saving results.** There is no prediction history to download later. Store the
+results you need, with their `request_id`, in your own database.
+`result.request_id`, `result.predictions_remaining` and `result.engine_version`
+come from the response headers, and `result.data` is the body as the API sent
+it.
 
-A plain string that looks like a path is read as a file: a single line ending
-in `.csv`, `.tsv`, `.txt` or `.json`, or containing the path separator. Its
-content is then sent to the API. If your application passes a string that comes
-from its own users, do not hand it to the SDK as data: pass rows, or a
-`pathlib.Path` you built yourself.
-
-Dates and times (`datetime`, `date`, pandas `Timestamp`) are sent as ISO 8601
-text, `Decimal` as a number, and missing values (`NaN`, `NaT`, `pd.NA`,
-infinities) as null. This holds for DataFrames and for lists of dictionaries,
-so `pd.read_csv(..., parse_dates=["date"])` works as is. A value that still
-cannot be sent as JSON raises `SpavikDataError` naming the column.
-
-CSV headers must be unique and non-empty, and lose their leading and trailing
-spaces (`"plan "` becomes `"plan"`, as in the JavaScript SDK). Rows with more
-fields than the header and invalid quoting raise `SpavikDataError` with the line
-number before any API call. Missing values in shorter rows remain `None`; quoted
-commas and newlines are preserved.
-
-Two differences with the JavaScript SDK remain on CSV text. An integer too large
-for a JavaScript number stays a Python `int` here, while the JavaScript SDK keeps
-it as text. A quote inside an unquoted field (`5" screen`) is accepted here as a
-literal character, while the JavaScript SDK refuses the file. Send lists of
-dictionaries or a DataFrame when the two SDKs must read the same data
-identically.
-
-## Outcome feedback and data retention
-
-Zero Data Retention only disables the archiving of the inputs and outputs of
-`evaluate`, `backtest`, `forecast` and `predict`. API contracts and behavior are
-identical for every data policy. Successful idempotent responses remain
-replayable from a technical cache for 24 hours. There is no prediction-history endpoint on any plan,
-and no `model.predictions()` method. Save prediction results and their
-`request_id` values in your application if you need them later. The API request
-log contains technical metadata, not prediction values.
-
-Model creation, context, diagnostics, versions and outcome feedback are
-functional model data. They require no additional retention opt-in, including
-under Zero Data Retention:
-
-```python
-from spavik import Spavik
-
-with Spavik() as client:
-    model = client.train("churn.csv", target="churn")
-    model.submit_outcomes([
-        {"features": {"plan": "pro", "seats": 12, "tickets_90d": 2}, "actual": 1},
-    ])
-    model.refresh()
-```
-
-Every outcome requires a non-empty `features` object and `actual`, on every
-plan. An optional `request_id` is correlation metadata; no inference archive
-is queried to recover features. Pending outcomes remain available until integration or model deletion.
-Examples integrated into the model become part of its persistent context.
-To measure prediction quality, also provide the original `prediction`, `version`
-and exact `engine`, plus `probabilities` when available. These client-reported
-measurements populate `observed` and `quality_reports`, with source
-`client_reported_predictions`; inference archives are never used for performance.
-The same rules apply to `Spavik` and `AsyncSpavik`.
-
-## What you can do
-
-- Classification and regression
-- Time-series forecasting
-- Dataset validation and evaluation
-- Model performance monitoring and outcome feedback
+**Outcomes and data retention.** Each outcome needs a non-empty `features`
+object and `actual`. To measure quality, also send the original `prediction`,
+`version` and `engine`. Zero Data Retention only stops the archiving of
+`evaluate`, `backtest`, `forecast` and `predict` inputs and outputs; models,
+versions and outcomes are model data and are kept on every plan.
 
 ## Documentation
 
-See [docs.spavik.co](https://docs.spavik.co) for guides and the API reference.
-For development and contributions, see [CONTRIBUTING.md](CONTRIBUTING.md).
+- [Python guide](https://docs.spavik.co/libraries/python)
+- [Quickstart](https://docs.spavik.co/start) and [API reference](https://docs.spavik.co)
+- [Changelog](https://github.com/spavik-co/spavik-python-sdk/blob/main/CHANGELOG.md)
+- [Report an issue](https://github.com/spavik-co/spavik-python-sdk/issues)
+
+The API may still change before 1.0, and breaking changes are listed in the
+changelog. Contributions are welcome, see
+[CONTRIBUTING.md](https://github.com/spavik-co/spavik-python-sdk/blob/main/CONTRIBUTING.md).
 
 ## License
 
-[Apache-2.0](LICENSE)
+[Apache-2.0](https://github.com/spavik-co/spavik-python-sdk/blob/main/LICENSE)
