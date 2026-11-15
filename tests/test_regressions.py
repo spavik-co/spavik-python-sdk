@@ -10,7 +10,7 @@ import pytest
 from spavik import AsyncSpavik, Spavik, SpavikDataError, SpavikTransportError
 
 
-ROWS = [{"x": i, "target": i % 2} for i in range(12)]
+ROWS = [{"x": i, "target": i % 2} for i in range(120)]
 
 
 @pytest.fixture(params=[False, True], ids=["sync", "async"])

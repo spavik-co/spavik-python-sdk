@@ -1,9 +1,9 @@
-"""Erreurs Spavik.
+"""Spavik errors.
 
-Une exception par famille, chacune portant le code machine, le detail rendu par
-l'API, le statut HTTP et le `request_id`. Ce dernier est la seule chose
-exploitable pour un support : il est emis sur chaque reponse et figure dans le
-message comme dans le `repr`.
+One exception per family, each carrying the machine code, the detail returned
+by the API, the HTTP status and the `request_id`. The request id is what
+support needs: the API sends it on every response, and it appears in the
+message and in the `repr`.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ _CODE_MACHINE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 class SpavikError(Exception):
-    """Racine de toutes les erreurs de la bibliotheque."""
+    """Base class of every error raised by the library."""
 
     def __init__(
         self,
@@ -55,9 +55,9 @@ class SpavikError(Exception):
 
 
 class SpavikDataError(SpavikError):
-    """Refus prononce en local, avant tout appel reseau.
+    """Refused locally, before any network call.
 
-    Rien n'a ete envoye, rien n'a ete facture.
+    Nothing was sent and nothing was billed.
     """
 
 
@@ -68,39 +68,44 @@ class SpavikTransportError(SpavikError):
 
 
 class SpavikAuthError(SpavikError):
-    """Cle absente, invalide, revoquee, ou insuffisante pour la route."""
+    """API key missing, invalid, revoked, or not allowed on this route.
+
+    A missing key is refused locally, before any request is sent.
+    """
 
 
 class SpavikCreditsExhausted(SpavikError):
-    """Le solde ne couvre pas l'appel demande. GET /v1/usage dit ce qu'il reste."""
+    """The balance does not cover this call. `usage()` tells what is left."""
 
 
 class SpavikQuotaExceeded(SpavikError):
-    """Une limite du plan est atteinte : nombre de modeles, taille, lignes."""
+    """A plan limit is reached: number of models, size, rows or columns."""
 
 
 class SpavikValidationError(SpavikError):
-    """L'API a refuse la requete telle qu'elle est formee."""
+    """The API refused the request as it was formed."""
 
 
 class SpavikNotFound(SpavikError):
-    """La ressource visee n'existe pas, ou n'appartient pas a ce workspace."""
+    """The resource does not exist, or does not belong to this workspace."""
 
 
 class SpavikConflict(SpavikError):
-    """L'etat courant interdit l'operation : rejeu, traitement en cours, rien a integrer."""
+    """The current state forbids the operation: replay, request in progress,
+    nothing to integrate, archived model, or retired engine (HTTP 410)."""
 
 
 class SpavikRateLimited(SpavikError):
-    """Rate limit reached; the transport respects Retry-After."""
+    """Rate limit reached. The transport waits for Retry-After up to 60
+    seconds; a longer wait is raised at once instead of blocking the call."""
 
 
 class SpavikUnavailable(SpavikError):
-    """Une dependance manque ou dort : moteur, journal analytique, stockage."""
+    """A dependency is missing or asleep: engine, analytics log, storage."""
 
 
 class SpavikServerError(SpavikError):
-    """Defaut cote API."""
+    """Failure on the API side."""
 
 
 _PAR_FAMILLE = {
@@ -124,6 +129,9 @@ _PAR_STATUT = {
     403: SpavikAuthError,
     404: SpavikNotFound,
     409: SpavikConflict,
+    # 410 ENGINE_RETIRED : la version demandee n'existe plus, choisir une
+    # version active ou omettre engine_version.
+    410: SpavikConflict,
     413: SpavikQuotaExceeded,
     422: SpavikValidationError,
     429: SpavikRateLimited,

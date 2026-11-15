@@ -126,15 +126,16 @@ class ApiSimulee:
                                     "validation": {"row_count": len(corps.get("data") or [])}})
 
         if chemin == "/v1/models" and requete.method == "GET":
-            limite = int(requete.url.params.get("limit", 50))
+            # Comme la vraie API : une page ne depasse jamais 200 elements.
+            limite = min(int(requete.url.params.get("limit", 50)), 200)
             decalage = int(requete.url.params.get("offset", 0))
             voulu = requete.url.params.get("status")
             tous = [m for m in self.modeles.values()
                     if (m.get("status") == "archived") == (voulu == "archived")]
             page = tous[decalage:decalage + limite]
-            return self._json(200, {"data": page, "pagination": {"total": len(tous),
-                                                                 "limit": limite,
-                                                                 "offset": decalage}})
+            return self._json(200, {"data": page, "pagination": {
+                "total": len(tous), "limit": limite, "offset": decalage,
+                "has_more": decalage + len(page) < len(tous)}})
 
         if chemin.endswith("/predict"):
             lignes = corps.get("rows") or []

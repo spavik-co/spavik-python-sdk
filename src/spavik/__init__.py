@@ -1,20 +1,21 @@
-"""Client Python de l'API Spavik.
+"""Python client for the Spavik API.
 
-Perimetre moteur : entrainer, predire, prevoir, remonter des verites, integrer,
-lister, mesurer. Authentification par cle d'usage uniquement.
+Evaluate, train, predict, forecast, report outcomes, refresh, list and
+measure. Authentication by API key only.
 
     from spavik import Spavik
 
-    spavik = Spavik()                                  # lit SPAVIK_API_KEY
-    model  = spavik.train("churn.csv", target="churn") # gratuit
-    print(model.predict({"plan": "pro", "seats": 12}))
+    spavik = Spavik()                                  # reads SPAVIK_API_KEY
+    model  = spavik.train("churn.csv", target="churn") # free
+    print(model.predict({"plan": "pro", "seats": 12}).predictions)
 """
 
 from __future__ import annotations
 
-__version__ = "0.1.0a2"
+__version__ = "0.1.0a3"
 
 from ._contract import API_VERSION, OPERATIONS
+from ._types import BacktestReport, EvaluationReport, Usage
 from .client import (
     AsyncModel,
     AsyncSpavik,
@@ -44,6 +45,7 @@ __all__ = [
     "__version__", "API_VERSION", "OPERATIONS",
     "Spavik", "AsyncSpavik", "Model", "AsyncModel",
     "Result", "Prediction", "Forecast",
+    "EvaluationReport", "BacktestReport", "Usage",
     "SpavikError", "SpavikDataError", "SpavikTransportError", "SpavikAuthError",
     "SpavikCreditsExhausted", "SpavikQuotaExceeded", "SpavikValidationError",
     "SpavikNotFound", "SpavikConflict", "SpavikRateLimited", "SpavikUnavailable",

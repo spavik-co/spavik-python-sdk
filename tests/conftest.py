@@ -34,20 +34,26 @@ def aspavik(api: ApiSimulee) -> AsyncSpavik:
                        client=httpx.AsyncClient(transport=transport))
 
 
+# Douze profils, deux classes.
+_PROFILS = [
+    {"plan": "pro",  "seats": 12, "tickets_90d": 3, "churn": 0},
+    {"plan": "free", "seats": 1,  "tickets_90d": 9, "churn": 1},
+    {"plan": "pro",  "seats": 40, "tickets_90d": 1, "churn": 0},
+    {"plan": "free", "seats": 2,  "tickets_90d": 7, "churn": 1},
+    {"plan": "team", "seats": 8,  "tickets_90d": 2, "churn": 0},
+    {"plan": "free", "seats": 1,  "tickets_90d": 12, "churn": 1},
+    {"plan": "pro",  "seats": 25, "tickets_90d": 0, "churn": 0},
+    {"plan": "team", "seats": 6,  "tickets_90d": 5, "churn": 1},
+    {"plan": "pro",  "seats": 18, "tickets_90d": 1, "churn": 0},
+    {"plan": "free", "seats": 3,  "tickets_90d": 8, "churn": 1},
+    {"plan": "team", "seats": 11, "tickets_90d": 2, "churn": 0},
+    {"plan": "pro",  "seats": 30, "tickets_90d": 4, "churn": 0},
+]
+
+
 @pytest.fixture
 def churn() -> List[Dict[str, Any]]:
-    """Douze lignes, deux classes : le minimum que l'API accepte, plus deux."""
-    return [
-        {"plan": "pro",  "seats": 12, "tickets_90d": 3, "churn": 0},
-        {"plan": "free", "seats": 1,  "tickets_90d": 9, "churn": 1},
-        {"plan": "pro",  "seats": 40, "tickets_90d": 1, "churn": 0},
-        {"plan": "free", "seats": 2,  "tickets_90d": 7, "churn": 1},
-        {"plan": "team", "seats": 8,  "tickets_90d": 2, "churn": 0},
-        {"plan": "free", "seats": 1,  "tickets_90d": 12, "churn": 1},
-        {"plan": "pro",  "seats": 25, "tickets_90d": 0, "churn": 0},
-        {"plan": "team", "seats": 6,  "tickets_90d": 5, "churn": 1},
-        {"plan": "pro",  "seats": 18, "tickets_90d": 1, "churn": 0},
-        {"plan": "free", "seats": 3,  "tickets_90d": 8, "churn": 1},
-        {"plan": "team", "seats": 11, "tickets_90d": 2, "churn": 0},
-        {"plan": "pro",  "seats": 30, "tickets_90d": 4, "churn": 0},
-    ]
+    """120 lignes, deux classes : le minimum que l'API accepte (100), plus vingt,
+    comme les jeux d'essai de l'API."""
+    return [dict(_PROFILS[i % 12], seats=_PROFILS[i % 12]["seats"] + i // 12)
+            for i in range(120)]

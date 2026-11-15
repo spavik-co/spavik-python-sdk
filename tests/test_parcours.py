@@ -102,8 +102,8 @@ async def test_asynchrone_refuse_pareil(aspavik, api, churn):
     from spavik import SpavikDataError
 
     with pytest.raises(SpavikDataError) as exc:
-        await aspavik.train(churn[:8], target="churn")
-    assert "at least 10 rows" in str(exc.value)
+        await aspavik.train(churn[:42], target="churn")
+    assert "at least 100 rows" in str(exc.value)
     assert api.appels == []
     await aspavik.aclose()
 
@@ -250,14 +250,15 @@ def test_le_modele_dit_les_colonnes_qu_il_attend(spavik, api, churn):
 
 async def test_evaluer_asynchrone(aspavik, api, churn):
     try:
-        rapport = await aspavik.evaluate(churn, target="churn", engine_family="presage")
+        rapport = await aspavik.evaluate(churn, target="churn", task="classification",
+                                         max_samples=500)
         assert rapport["trial"]["verdict"]["level"] == "usable"
         requete = api.appels[-1]
         assert requete.method == "POST"
         assert requete.url.path == "/v1/datasets/evaluate"
         import json
         assert json.loads(requete.content) == {
-            "data": churn, "target": "churn", "engine_family": "presage",
+            "data": churn, "target": "churn", "task": "classification", "max_samples": 500,
         }
         assert api.solde == 100 and not api.modeles
     finally:

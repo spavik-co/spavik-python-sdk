@@ -1,8 +1,8 @@
-"""Verification des webhooks entrants.
+"""Verification of incoming webhooks.
 
-Le secret de signature n'est rendu qu'une fois, a la creation du webhook. La
-comparaison se fait a temps constant : une comparaison naive laisse fuir, par sa
-duree, le prefixe correct d'une signature forgee.
+The signing secret is shown only once, when the webhook is created. The
+comparison runs in constant time: a naive comparison leaks, through its
+duration, the correct prefix of a forged signature.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ TOLERANCE_SECONDS = 300
 
 
 class SpavikSignatureError(SpavikError):
-    """La signature ne correspond pas, ou l'horodatage est trop ancien."""
+    """The signature does not match, the timestamp is too old, or the secret is missing."""
 
 
 def _entete(entetes: Mapping[str, str], nom: str) -> Optional[str]:
@@ -49,16 +49,23 @@ def _lire_signature(valeur: str) -> Tuple[int, List[str]]:
 def verify(
     body: Union[str, bytes],
     headers: Mapping[str, str],
-    secret: str,
+    secret: Optional[str],
     *,
     tolerance: int = TOLERANCE_SECONDS,
 ) -> Dict[str, Any]:
-    """Verifie la signature et rend l'evenement decode.
+    """Verify the signature and return the decoded event.
 
-    L'API envoie `Spavik-Signature: t=<secondes>,v1=<hex>` et signe
-    `<t>.` suivi des octets bruts. `body` doit etre ces octets tels que recus :
-    un corps deja parse puis reserialise ne redonne pas la meme signature.
+    The API sends `Spavik-Signature: t=<seconds>,v1=<hex>` and signs `<t>.`
+    followed by the raw body. `body` must be those bytes as received: a body
+    parsed then serialised again does not give the same signature.
+
+    An empty or missing `secret` raises SpavikSignatureError: with an empty
+    secret, anyone could forge an event.
     """
+    # Un secret vide signerait n'importe quoi : os.environ.get(..., "") ne
+    # doit jamais ouvrir la porte.
+    if not secret:
+        raise SpavikSignatureError("missing webhook secret")
     if isinstance(body, str):
         octets = body.encode("utf-8")
     else:

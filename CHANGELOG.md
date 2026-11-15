@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.1.0a3
+
+- Breaking: training needs at least 100 rows, up from 10, as the API now
+  requires. Fewer raise `SpavikDataError` ("training needs at least 100 rows,
+  N provided. Nothing was sent.") before any call. The API applies the same
+  minimum to `evaluate`, reported in `validation`.
+- Breaking: without an API key, every call except `engines()` and
+  `engine_families()` raises `SpavikAuthError` locally ("no API key: set
+  SPAVIK_API_KEY or pass api_key. Nothing was sent."). `TOKEN_INVALID` is
+  mapped to the authentication family.
+- Breaking: `evaluate()` no longer accepts `engine_family`, which the API never
+  read on this route. It accepts `task` and `max_samples` instead.
+- Breaking: dictionaries returned by `evaluate()`, `backtest()` and `usage()`,
+  `Result.data` and `Model.data` no longer carry the internal keys
+  `_request_id`, `_predictions_remaining` and `_engine_version`. Read
+  `Result.request_id`, `Result.predictions_remaining` and the new
+  `Result.engine_version` instead.
+- `train`, `forecast`, `evaluate` and `backtest` declare their parameters, in
+  both clients, instead of `**kw`. `evaluate()`, `backtest()` and `usage()` are
+  typed with the new `EvaluationReport`, `BacktestReport` and `Usage`.
+- `train`, `forecast`, `Model.predict`, `Model.submit_outcomes` and
+  `Model.refresh` accept `idempotency_key`, reused on every retry, to replay a
+  call whose outcome is uncertain without a second charge.
+- Dates, `Decimal`, `NaN`, `NaT` and infinities are converted before sending,
+  for DataFrames and lists of dictionaries alike. A value that still cannot be
+  sent as JSON raises `SpavikDataError` naming the column.
+- `models()` follows `pagination.has_more` and caps the page size at 200: with
+  `limit` above 200 it used to stop after the first page.
+- `SPAVIK_BASE_URL` is read when the client is created, not when `spavik` is
+  imported.
+- `verify()` raises `SpavikSignatureError("missing webhook secret")` when the
+  secret is empty or None, instead of accepting a signature made with an empty
+  key.
+- A `Retry-After` longer than 60 seconds is no longer slept through: the error
+  is raised at once.
+- Model identifiers are percent-encoded in URLs.
+- CSV headers lose their leading and trailing spaces, as in the JavaScript SDK.
+- `restore()` returns the restored model. `Model.performance()` is typed as
+  returning `Result`. `Forecast.backtest` gives the backtest report of
+  `forecast(..., backtest=True)`.
+- A horizon that is not a whole number, such as 7.5, is refused locally. With
+  `item_id`, each series must cover the horizon, and the `item_id` column must
+  exist.
+- `410 ENGINE_RETIRED` raises `SpavikConflict`. A training response without a
+  model id raises `SpavikError` instead of `KeyError`.
+- `archive` and `restore` no longer send an `Idempotency-Key`, which the
+  contract does not declare for these routes.
+- Public docstrings are in English. The README documents the Free plan
+  (100 predictions per calendar month, reset on the 1st at 00:00 UTC), how a
+  string that looks like a path is read, and the two remaining CSV differences
+  with the JavaScript SDK.
+
 ## 0.1.0a2
 
 - Breaking: `train()` no longer accepts `explain`. Feature importance moves to
@@ -12,7 +64,7 @@
 
 ## 0.1.0a1
 
-First pre-release on PyPI: `pip install --pre spavik`.
+First pre-release on PyPI.
 
 
 - Keep CSV values with a leading zero, such as `007` or a postal code, as text

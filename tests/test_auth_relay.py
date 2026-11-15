@@ -5,7 +5,7 @@ import pytest
 from spavik import Spavik, AsyncSpavik, SpavikAuthError
 
 
-@pytest.mark.parametrize("key", ["", "sk-spv-admin-fixture", "opaque-token"])
+@pytest.mark.parametrize("key", ["sk-spv-admin-fixture", "opaque-token"])
 @pytest.mark.parametrize("status", [200, 401, 403])
 def test_credentials_are_decided_by_api(monkeypatch, key, status):
     monkeypatch.setenv("SPAVIK_API_KEY", "environment-must-not-leak")
@@ -23,11 +23,11 @@ def test_credentials_are_decided_by_api(monkeypatch, key, status):
             with pytest.raises(SpavikAuthError):
                 client.usage()
     assert len(calls) == 1
-    assert calls[0].headers.get("X-Spavik-Api-Key") == (key if key else None)
+    assert calls[0].headers.get("X-Spavik-Api-Key") == key
     assert "Authorization" not in calls[0].headers
 
 
-@pytest.mark.parametrize("key", ["", "sk-spv-admin-fixture", "opaque-token"])
+@pytest.mark.parametrize("key", ["sk-spv-admin-fixture", "opaque-token"])
 async def test_async_credentials_reach_api(monkeypatch, key):
     monkeypatch.setenv("SPAVIK_API_KEY", "environment-must-not-leak")
     calls = []
@@ -39,7 +39,7 @@ async def test_async_credentials_reach_api(monkeypatch, key):
         with pytest.raises(SpavikAuthError):
             await client.usage()
     assert len(calls) == 1
-    assert calls[0].headers.get("X-Spavik-Api-Key") == (key if key else None)
+    assert calls[0].headers.get("X-Spavik-Api-Key") == key
     assert "Authorization" not in calls[0].headers
 
 

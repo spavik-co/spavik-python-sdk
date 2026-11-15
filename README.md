@@ -1,7 +1,7 @@
 # Spavik Python SDK
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![CI](https://github.com/spavik-co/spavik-python-sdk/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/spavik-co/spavik-python-sdk/actions/workflows/ci.yml)
+[![CI](https://github.com/spavik-co/spavik-python-sdk/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/spavik-co/spavik-python-sdk/actions/workflows/ci.yml)
 
 Prediction infrastructure for developers.
 
@@ -21,11 +21,17 @@ python -m pip install spavik
 
 Create a free account at [spavik.co](https://spavik.co) and generate your API key from the dashboard.
 
-New accounts include **1,000 free predictions**. No credit card required.
+The Free plan includes **100 predictions per calendar month**, reset on the
+1st at 00:00 UTC. No credit card required.
 
 ```bash
 export SPAVIK_API_KEY="sk-spv-api-..."
 ```
+
+The client reads `SPAVIK_API_KEY`, and `SPAVIK_BASE_URL` when set, at the moment
+it is created. Without a key, every call except the public engine catalogue
+(`engines()`, `engine_families()`) raises `SpavikAuthError` locally, and nothing
+is sent.
 
 ## Quickstart
 
@@ -55,6 +61,15 @@ python quickstart.py
 `result.predictions` contains the predictions returned by the API. Reuse the trained
 model for subsequent predictions; you do not need to train for every request.
 
+Training needs at least 100 rows; with fewer, `train()` raises `SpavikDataError`
+and nothing is sent. 100 rows give a much better chance of a useful result, not
+a guarantee: call `client.evaluate("churn.csv", target="churn")` first, it is
+free and says whether the data can predict that column.
+
+`result.request_id`, `result.predictions_remaining` and `result.engine_version`
+come from the response headers. `result.data` is the response body as the API
+sent it.
+
 ## Timeouts and uncertain results
 
 `Spavik(timeout=0.25)` and `AsyncSpavik(timeout=0.25)` apply that timeout to
@@ -68,10 +83,20 @@ with retries and backoff.
 When network retries are exhausted, `SpavikTransportError.idempotency_key`
 preserves the key used for an idempotent request, and `__cause__` retains the
 underlying HTTPX error. A read request has no idempotency key.
-After a timeout, the server may already have executed the request. Keep the key
-and request details to inspect the outcome or contact support. Do not blindly
-call the mutation again: a new SDK call generates a new key and can repeat the
-operation. The SDK does not expose a resume-by-key method.
+After a timeout, the server may already have executed the request. Do not
+blindly call the mutation again: a new SDK call generates a new key and can
+repeat the operation. To replay safely, pass the same key yourself:
+`train`, `forecast`, `Model.predict`, `Model.submit_outcomes` and
+`Model.refresh` accept `idempotency_key=...`, reused on every retry, so a
+replayed call is not billed twice.
+
+```python
+model.predict(rows, idempotency_key="order-1234-score")
+```
+
+When the API asks to wait (`Retry-After`), the client waits up to 60 seconds
+before retrying. A longer wait is not slept through: the error, such as
+`SpavikRateLimited`, is raised at once.
 
 ## Input formats
 
@@ -80,17 +105,37 @@ text and file paths. JSON strings containing URLs or paths remain JSON content.
 Use `pathlib.Path` to explicitly identify a file, including filenames that start
 with `[` or `{`, or have no extension.
 
-CSV headers must be unique and non-empty. Rows with more fields than the header
-and invalid quoting raise `SpavikDataError` with the line number before any API
-call. Missing values in shorter rows remain `None`; quoted commas and newlines
-are preserved.
+A plain string that looks like a path is read as a file: a single line ending
+in `.csv`, `.tsv`, `.txt` or `.json`, or containing the path separator. Its
+content is then sent to the API. If your application passes a string that comes
+from its own users, do not hand it to the SDK as data: pass rows, or a
+`pathlib.Path` you built yourself.
+
+Dates and times (`datetime`, `date`, pandas `Timestamp`) are sent as ISO 8601
+text, `Decimal` as a number, and missing values (`NaN`, `NaT`, `pd.NA`,
+infinities) as null. This holds for DataFrames and for lists of dictionaries,
+so `pd.read_csv(..., parse_dates=["date"])` works as is. A value that still
+cannot be sent as JSON raises `SpavikDataError` naming the column.
+
+CSV headers must be unique and non-empty, and lose their leading and trailing
+spaces (`"plan "` becomes `"plan"`, as in the JavaScript SDK). Rows with more
+fields than the header and invalid quoting raise `SpavikDataError` with the line
+number before any API call. Missing values in shorter rows remain `None`; quoted
+commas and newlines are preserved.
+
+Two differences with the JavaScript SDK remain on CSV text. An integer too large
+for a JavaScript number stays a Python `int` here, while the JavaScript SDK keeps
+it as text. A quote inside an unquoted field (`5" screen`) is accepted here as a
+literal character, while the JavaScript SDK refuses the file. Send lists of
+dictionaries or a DataFrame when the two SDKs must read the same data
+identically.
 
 ## Outcome feedback and data retention
 
-Zero Data Retention only disables GCS/BigQuery archiving of the inputs and
-outputs of `evaluate`, `backtest`, `forecast` and `predict`. API contracts and
-behavior are identical for every data policy. Successful idempotent responses
-remain replayable from the PostgreSQL technical cache for 24 hours. There is no prediction-history endpoint on any plan,
+Zero Data Retention only disables the archiving of the inputs and outputs of
+`evaluate`, `backtest`, `forecast` and `predict`. API contracts and behavior are
+identical for every data policy. Successful idempotent responses remain
+replayable from a technical cache for 24 hours. There is no prediction-history endpoint on any plan,
 and no `model.predictions()` method. Save prediction results and their
 `request_id` values in your application if you need them later. The API request
 log contains technical metadata, not prediction values.

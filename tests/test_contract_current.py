@@ -6,7 +6,7 @@ import pytest
 from spavik import Spavik, AsyncSpavik, SpavikError
 from spavik._retry import retry_delay
 
-ROWS = [{"x": i, "y": i % 2} for i in range(12)]
+ROWS = [{"x": i, "y": i % 2} for i in range(120)]
 CALIBRATION = {"available": False, "unavailable_reason": "missing_probabilities",
     "evaluated_count": 12, "evaluated_on": "test", "kind": "one_vs_rest",
     "interpretation": "descriptive_only", "binning": "uniform", "n_bins": 10,
@@ -65,7 +65,8 @@ async def test_wire_contract_and_diagnostics(asynchronous):
             assert sent == {"data": ROWS, **options}
             data = result.data if method == "forecast" else result
             assert data["backtest"]["predictions"] == POINTS
-        report = await resolve(client.evaluate(ROWS, target="y", engine_family="presage"))
+        report = await resolve(client.evaluate(ROWS, target="y"))
+        assert "engine_family" not in json.loads(calls[-1].content)
         assert report["trial"]["calibration"] == CALIBRATION
         report = await resolve(model.performance())
         assert report["training_calibration"] == CALIBRATION

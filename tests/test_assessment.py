@@ -17,8 +17,8 @@ async def test_rest_assessment_is_preserved(method, status):
         return httpx.Response(200, json=payload)
     data = [{"x": 1, "y": 2}]
     with httpx.Client(transport=httpx.MockTransport(handle)) as transport:
-        result = getattr(Spavik("", client=transport), method)(data, target="y")
-        assert result == {**payload, "_request_id": None}
+        result = getattr(Spavik("fixture", client=transport), method)(data, target="y")
+        assert result == payload
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as transport:
-        result = await getattr(AsyncSpavik("", client=transport), method)(data, target="y")
-        assert result == {**payload, "_request_id": None}
+        result = await getattr(AsyncSpavik("fixture", client=transport), method)(data, target="y")
+        assert result == payload

@@ -61,8 +61,9 @@ User-Agent contains the SDK name and version.
 
 ## Current API contract
 
-Model creation and evaluation select an optional engine family; the API owns
-the default. Prediction selects an optional engine version within that family.
+Model creation selects an optional engine family; the API owns the default.
+Evaluation does not take one: `POST /v1/datasets/evaluate` reads only
+`target`, `task`, `max_samples` and `explain`. Prediction selects an optional engine version within that family.
 Forecast and backtest accept both. Changing engine version within a model's
 family does not require retraining. Engine versions and model data versions
 are distinct; the exact serving engine is available on prediction/forecast

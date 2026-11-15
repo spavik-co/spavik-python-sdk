@@ -19,15 +19,34 @@ def retry_allowed(status, code, method, path, idempotent):
     return status is None or status in {429, 500, 502, 503, 504}
 
 
-def retry_delay(value, code, fallback):
-    if value is not None:
+# Au-dela, attendre bloquerait l'appelant sans qu'il le sache : on rend la main.
+RETRY_AFTER_MAX = 60.0
+
+
+def retry_after_seconds(value):
+    """Retry-After in seconds, from a number or an HTTP date; None if unreadable."""
+    if value is None:
+        return None
+    try:
+        seconds = float(value)
+    except (ValueError, TypeError):
         try:
-            seconds = float(value)
-        except (ValueError, TypeError):
-            try:
-                seconds = parsedate_to_datetime(value).timestamp() - time.time()
-            except (ValueError, TypeError, OverflowError):
-                seconds = float("nan")
-        if math.isfinite(seconds) and seconds >= 0:
-            return seconds
+            seconds = parsedate_to_datetime(value).timestamp() - time.time()
+        except (ValueError, TypeError, OverflowError):
+            return None
+    if math.isfinite(seconds) and seconds >= 0:
+        return seconds
+    return None
+
+
+def retry_after_too_long(value):
+    """True when the API asks to wait longer than RETRY_AFTER_MAX seconds."""
+    seconds = retry_after_seconds(value)
+    return seconds is not None and seconds > RETRY_AFTER_MAX
+
+
+def retry_delay(value, code, fallback):
+    seconds = retry_after_seconds(value)
+    if seconds is not None:
+        return min(seconds, RETRY_AFTER_MAX)
     return DELAYS.get(code, fallback)

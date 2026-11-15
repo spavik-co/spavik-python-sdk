@@ -11,12 +11,19 @@ import pytest
 from spavik import SpavikDataError
 
 
-def test_moins_de_dix_lignes_refuse_sans_appel(spavik, api, churn):
+def test_moins_de_cent_lignes_refuse_sans_appel(spavik, api, churn):
     with pytest.raises(SpavikDataError) as exc:
-        spavik.train(churn[:8], target="churn")
-    assert "at least 10 rows" in str(exc.value)
-    assert "8 provided" in str(exc.value)
+        spavik.train(churn[:42], target="churn")
+    assert str(exc.value) == "training needs at least 100 rows, 42 provided. Nothing was sent."
     assert api.appels == []
+
+
+def test_cent_lignes_suffisent(spavik, api, churn):
+    with pytest.raises(SpavikDataError, match="99 provided"):
+        spavik.train(churn[:99], target="churn")
+    assert api.appels == []
+    spavik.train(churn[:100], target="churn")
+    assert api.compte("/v1/models") == 1
 
 
 def test_colonne_cible_absente_suggere_la_proche(spavik, api, churn):
@@ -67,7 +74,7 @@ def test_un_refus_local_ne_va_pas_chercher_le_moteur(spavik, api, churn):
     aller-retour, et le refus ne serait plus vraiment local.
     """
     with pytest.raises(SpavikDataError):
-        spavik.train(churn[:8], target="churn")
+        spavik.train(churn[:42], target="churn")
     assert api.appels == []
     assert api.compte("/v1/engines") == 0
 

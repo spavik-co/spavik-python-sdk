@@ -15,8 +15,8 @@ from typing import Any, Dict, List, Optional, Sequence
 from ._data import Lignes, colonnes
 from .errors import SpavikDataError
 
-# L'API refuse d'apprendre en dessous de ce nombre de lignes.
-MIN_LIGNES_ENTRAINEMENT = 10
+# L'API refuse d'apprendre en dessous de ce nombre de lignes (too_few_rows).
+MIN_LIGNES_ENTRAINEMENT = 100
 
 
 def _suggestion(nom: str, connues: Sequence[str]) -> str:
@@ -77,20 +77,44 @@ def prediction(lignes: Lignes) -> None:
         raise SpavikDataError("no rows to score. Nothing was sent.")
 
 
-def previsions(lignes: Lignes, cible: str, horizon: int, timestamp: Optional[str]) -> None:
-    if horizon < 1:
-        raise SpavikDataError(f"the horizon must be at least 1, got {horizon}.")
+def horizon_entier(horizon: Any, suffixe: str = "") -> None:
+    """Un horizon est un nombre entier de pas, au moins 1. 7.5 n'a pas de sens."""
+    entier = isinstance(horizon, int) and not isinstance(horizon, bool)
+    if not entier or horizon < 1:
+        raise SpavikDataError(f"the horizon must be at least 1, got {horizon}.{suffixe}")
+
+
+def previsions(lignes: Lignes, cible: str, horizon: int, timestamp: Optional[str],
+               item_id: Optional[str] = None) -> None:
+    horizon_entier(horizon)
     colonne_presente(lignes, cible, role="target")
     if timestamp:
         colonne_presente(lignes, timestamp, role="timestamp")
+    if item_id:
+        colonne_presente(lignes, item_id, role="item_id")
 
     # Une serie plus courte que son propre horizon est le cas qui a fait echouer
     # l'exemple publie de l'API : trois points pour un horizon de quatorze.
-    if len(lignes) < horizon:
+    if not item_id:
+        if len(lignes) < horizon:
+            raise SpavikDataError(
+                f"the series has {len(lignes)} point(s) for a horizon of {horizon}. "
+                "A series shorter than its horizon yields nothing usable: "
+                f"provide at least {horizon} points, preferably several times more."
+            )
+        return
+
+    # Plusieurs series : chacune doit couvrir l'horizon, pas seulement le total.
+    tailles: Dict[Any, int] = {}
+    for ligne in lignes:
+        cle = ligne.get(item_id)
+        tailles[cle] = tailles.get(cle, 0) + 1
+    serie, taille = min(tailles.items(), key=lambda paire: paire[1])
+    if taille < horizon:
         raise SpavikDataError(
-            f"the series has {len(lignes)} point(s) for a horizon of {horizon}. "
+            f"the series {serie!r} has {taille} point(s) for a horizon of {horizon}. "
             "A series shorter than its horizon yields nothing usable: "
-            f"provide at least {horizon} points, preferably several times more."
+            f"provide at least {horizon} points per series, preferably several times more."
         )
 
 

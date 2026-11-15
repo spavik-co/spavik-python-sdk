@@ -8,8 +8,11 @@ du CSV brut arrivent tous ici et repartent en liste de dictionnaires.
 from __future__ import annotations
 
 import csv
+import datetime as _dt
+import decimal
 import io
 import json
+import math
 import os
 import re
 from typing import Any, Dict, Iterable, List, Sequence
@@ -30,10 +33,15 @@ def _depuis_csv(texte: str, origine: str) -> Lignes:
     lecteur = csv.DictReader(io.StringIO(texte), dialect=dialecte, strict=True)
     lignes: Lignes = []
     try:
-        entetes = lecteur.fieldnames
-        if not entetes:
+        brutes = lecteur.fieldnames
+        if not brutes:
             raise SpavikDataError(f"{origine}: no readable header row.")
-        if any(not nom.strip() for nom in entetes) or len(set(entetes)) != len(entetes):
+        # Les espaces de bord ne font pas partie du nom : "plan " devient "plan",
+        # comme dans le SDK JS, pour que les colonnes d'un modele ne dependent
+        # pas du SDK qui l'a entraine.
+        entetes = [nom.strip() for nom in brutes]
+        lecteur.fieldnames = entetes
+        if any(not nom for nom in entetes) or len(set(entetes)) != len(entetes):
             raise SpavikDataError(
                 f"{origine}: CSV line {lecteur.line_num}: headers must be unique and non-empty."
             )
@@ -82,24 +90,53 @@ def _typer(valeur: Any) -> Any:
     return valeur
 
 
-def _depuis_dataframe(df: Any) -> Lignes:
-    lignes = df.to_dict(orient="records")
-    # NaN ne survit pas a JSON : il devient null, ce que l'API sait lire.
-    propre: Lignes = []
-    for ligne in lignes:
-        propre.append({k: (None if _est_nan(v) else _scalaire(v)) for k, v in ligne.items()})
+def _depuis_dataframe(df: Any, quoi: str) -> Lignes:
+    return [_nettoyer_ligne(ligne, quoi) for ligne in df.to_dict(orient="records")]
+
+
+def _nettoyer_ligne(ligne: Dict[Any, Any], quoi: str) -> Dict[str, Any]:
+    propre: Dict[str, Any] = {}
+    for cle, valeur in ligne.items():
+        propre[cle] = _nettoyer(valeur, quoi, cle)
     return propre
 
 
-def _est_nan(v: Any) -> bool:
-    return isinstance(v, float) and v != v
+def _nettoyer(v: Any, quoi: str, colonne: Any) -> Any:
+    """Ramene une valeur a ce que JSON sait porter.
 
-
-def _scalaire(v: Any) -> Any:
-    """numpy.int64 et consorts ne se serialisent pas : les ramener en types Python."""
-    item = getattr(v, "item", None)
-    if callable(item) and type(v).__module__.startswith("numpy"):
-        return item()
+    Dates en ISO 8601, valeurs manquantes (NaN, NaT, pd.NA, infinis) en None,
+    Decimal en float, types numpy en types Python. Le reste part tel quel s'il
+    se serialise, sinon l'erreur nomme la colonne.
+    """
+    if v is None or isinstance(v, (str, bool, int)):
+        return v
+    if isinstance(v, float):
+        return v if math.isfinite(v) else None
+    nom_type = type(v).__name__
+    if nom_type in ("NaTType", "NAType"):
+        return None
+    if isinstance(v, (_dt.datetime, _dt.date, _dt.time)):
+        return v.isoformat()
+    if isinstance(v, decimal.Decimal):
+        return float(v) if v.is_finite() else None
+    if type(v).__module__.startswith("numpy"):
+        if nom_type == "datetime64":
+            texte = str(v)
+            return None if texte == "NaT" else texte
+        item = getattr(v, "item", None)
+        if callable(item):
+            return _nettoyer(item(), quoi, colonne)
+    if isinstance(v, dict):
+        return {k: _nettoyer(x, quoi, colonne) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_nettoyer(x, quoi, colonne) for x in v]
+    try:
+        json.dumps(v)
+    except (TypeError, ValueError) as exc:
+        raise SpavikDataError(
+            f"{quoi}: column {colonne!r} holds a {nom_type} value that cannot be sent "
+            "as JSON. Convert it to text or a number first. Nothing was sent."
+        ) from exc
     return v
 
 
@@ -109,7 +146,7 @@ def normaliser(source: Any, *, quoi: str = "data") -> Lignes:
         raise SpavikDataError(f"{quoi}: nothing to send.")
 
     if hasattr(source, "to_dict") and hasattr(source, "columns"):
-        return _depuis_dataframe(source)
+        return _depuis_dataframe(source, quoi)
 
     if isinstance(source, (str, os.PathLike)):
         # PathLike est explicite. Une chaine JSON reste du contenu, meme avec
@@ -136,14 +173,14 @@ def normaliser(source: Any, *, quoi: str = "data") -> Lignes:
         return _depuis_csv(chemin.lstrip("\ufeff"), quoi)
 
     if isinstance(source, dict):
-        return [dict(source)]
+        return [_nettoyer_ligne(source, quoi)]
 
     if isinstance(source, Sequence) or isinstance(source, Iterable):
         lignes = list(source)
         if not lignes:
             raise SpavikDataError(f"{quoi}: the list is empty.")
         if all(isinstance(l, dict) for l in lignes):
-            return [dict(l) for l in lignes]
+            return [_nettoyer_ligne(l, quoi) for l in lignes]
         raise SpavikDataError(
             f"{quoi}: a list must contain dictionaries, "
             f"found {type(lignes[0]).__name__}."
