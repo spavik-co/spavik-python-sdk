@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0a3
+## 0.1.0
 
 - Breaking: training needs at least 100 rows, up from 10, as the API now
   requires. Fewer raise `SpavikDataError` ("training needs at least 100 rows,
