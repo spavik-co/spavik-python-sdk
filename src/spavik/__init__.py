@@ -12,7 +12,7 @@ measure. Authentication by API key only.
 
 from __future__ import annotations
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from ._contract import API_VERSION, OPERATIONS
 from ._types import BacktestReport, EvaluationReport, Usage
