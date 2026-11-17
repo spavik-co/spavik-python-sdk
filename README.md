@@ -111,53 +111,6 @@ the [Spavik MCP server](https://spavik.co/mcp-integration), and a
 [TypeScript SDK](https://www.npmjs.com/package/spavik) covers Node.js and edge
 runtimes.
 
-## Good to know in production
-
-**Configuration.** The client reads `SPAVIK_API_KEY`, and `SPAVIK_BASE_URL`
-when set, at the moment it is created. Without a key, every call except the
-public engine catalogue (`engines()`, `engine_families()`) raises
-`SpavikAuthError` locally and nothing is sent. Python 3.11 or later is required.
-
-**Timeouts.** `Spavik(timeout=...)` replaces every operation's default (15 s
-for account reads, 30 s for predictions, 60 s for forecasts, 120 s for
-training). It applies to each network phase of each attempt, not to the total
-duration of a call with retries.
-
-**Retries and safe replays.** Network errors and temporary API errors are
-retried with backoff. Mutations carry an idempotency key, kept across retries
-and left in `exc.idempotency_key` when retries run out. After a timeout the
-request may have run, so replay it with the same key rather than calling again:
-`train`, `forecast`, `predict`, `submit_outcomes` and `refresh` accept
-`idempotency_key=...`, and a replayed key is not billed twice. A `Retry-After`
-longer than 60 seconds is not waited for: the error is raised at once.
-
-```python
-model.predict(rows, idempotency_key="order-1234-score")
-```
-
-**Strings that look like files.** A single-line string ending in `.csv`, `.tsv`,
-`.txt` or `.json`, or containing a path separator, is read as a file and its
-content is sent. Never hand the SDK a string that comes from your own users as
-data: pass rows, or a `pathlib.Path` you built yourself.
-
-**CSV text.** Headers must be unique and non-empty, and lose their surrounding
-spaces. Malformed rows raise `SpavikDataError` with the line number before any
-call. Two edge cases differ from the TypeScript SDK: integers beyond 2^53 stay
-Python integers (TypeScript keeps them as text), and a quote inside an unquoted
-field is accepted (TypeScript refuses the file).
-
-**Saving results.** There is no prediction history to download later. Store the
-results you need, with their `request_id`, in your own database.
-`result.request_id`, `result.predictions_remaining` and `result.engine_version`
-come from the response headers, and `result.data` is the body as the API sent
-it.
-
-**Outcomes and data retention.** Each outcome needs a non-empty `features`
-object and `actual`. To measure quality, also send the original `prediction`,
-`version` and `engine`. Zero Data Retention only stops the archiving of
-`evaluate`, `backtest`, `forecast` and `predict` inputs and outputs; models,
-versions and outcomes are model data and are kept on every plan.
-
 ## Documentation
 
 - [Python guide](https://docs.spavik.co/libraries/python)

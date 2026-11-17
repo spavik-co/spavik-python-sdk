@@ -378,9 +378,9 @@ def _liste(reponse: Reponse) -> List[Dict[str, Any]]:
 class Spavik(_Base):
     """Synchronous client.
 
-    `api_key` defaults to SPAVIK_API_KEY and `base_url` to SPAVIK_BASE_URL,
-    both read when the client is created. Without a key, every call except
-    the engine catalogue is refused locally with SpavikAuthError.
+    `api_key` defaults to SPAVIK_API_KEY, read when the client is created.
+    Without a key, every call except the engine catalogue is refused locally
+    with SpavikAuthError.
 
     An explicit timeout overrides every operation's network timeout, per
     attempt. Omit it or use None for operation defaults.
