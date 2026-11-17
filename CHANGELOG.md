@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- Documentation only: the README drops its production notes section and no
+  longer describes a configurable API URL. The API lives at
+  https://api.spavik.co. No code change.
+
 ## 0.1.1
 
 - Documentation only: a new README, shown on PyPI and GitHub, that explains
