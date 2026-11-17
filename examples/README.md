@@ -1,7 +1,7 @@
 # Examples
 
 Run from the repository root after installing the SDK. Set `SPAVIK_API_KEY`
-securely and `SPAVIK_BASE_URL` to the desired API environment. These scripts
+securely. These scripts
 call the real API; they are not part of offline CI tests.
 
 ```sh
