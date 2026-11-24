@@ -1,7 +1,8 @@
 """Python client for the Spavik API.
 
 Evaluate, train, predict, forecast, report outcomes, refresh, list and
-measure. Authentication by API key only.
+measure. Authentication by API key only, sent as
+`Authorization: Bearer <key>`.
 
     from spavik import Spavik
 
@@ -12,7 +13,7 @@ measure. Authentication by API key only.
 
 from __future__ import annotations
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 from ._contract import API_VERSION, OPERATIONS
 from ._types import BacktestReport, EvaluationReport, Usage

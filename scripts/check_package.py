@@ -41,7 +41,8 @@ assert Path(spavik.__file__).resolve().is_relative_to((Path(__file__).parent / "
 calls = []
 def handler(request):
     calls.append(request)
-    assert request.headers["X-Spavik-Api-Key"] == "sk-spv-api-fixture"
+    assert request.headers["Authorization"] == "Bearer sk-spv-api-fixture"
+    assert "X-Spavik-Api-Key" not in request.headers
     assert str(request.url) == "https://fixture.invalid/v1/usage"
     return httpx.Response(200, json={"credit_balance": 7})
 

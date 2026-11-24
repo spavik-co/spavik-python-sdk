@@ -11,8 +11,8 @@ def responder(user_agent):
         assert request.headers["X-Spavik-Client-Name"] == "spavik-sdk-python"
         assert request.headers["X-Spavik-Client-Version"] == __version__
         assert request.headers["User-Agent"] == (user_agent or f"spavik-python/{__version__}")
-        assert request.headers["X-Spavik-Api-Key"] == "fixture-key"
-        assert "Authorization" not in request.headers
+        assert request.headers["Authorization"] == "Bearer fixture-key"
+        assert "X-Spavik-Api-Key" not in request.headers
         assert "X-API-Key" not in request.headers
         return httpx.Response(503, json={"message": "UNAVAILABLE"}) if len(calls) == 1 else httpx.Response(200, json={"plan": "free"})
     return reply, calls

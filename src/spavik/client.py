@@ -379,8 +379,13 @@ class Spavik(_Base):
     """Synchronous client.
 
     `api_key` defaults to SPAVIK_API_KEY, read when the client is created.
-    Without a key, every call except the engine catalogue is refused locally
-    with SpavikAuthError.
+    It is sent as `Authorization: Bearer <key>`, the only header that carries
+    it. Without a key, every call except the engine catalogue is refused
+    locally with SpavikAuthError.
+
+    A supplied `client` keeps its default headers, except Authorization, which
+    the key replaces. Do not set X-Spavik-Api-Key on it: a different key there
+    makes the API refuse the call with API_KEY_CONFLICT (SpavikAuthError).
 
     An explicit timeout overrides every operation's network timeout, per
     attempt. Omit it or use None for operation defaults.
@@ -622,9 +627,9 @@ class Spavik(_Base):
 
 
 class AsyncSpavik(_Base):
-    """Asynchronous client, with the same operations, configuration and
-    timeout precedence as Spavik. Omit timeout or use None for operation
-    defaults."""
+    """Asynchronous client, with the same operations, configuration,
+    authentication header and timeout precedence as Spavik. Omit timeout or
+    use None for operation defaults."""
 
     _modele = AsyncModel
 

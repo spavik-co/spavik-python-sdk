@@ -70,6 +70,10 @@ class SpavikTransportError(SpavikError):
 class SpavikAuthError(SpavikError):
     """API key missing, invalid, revoked, or not allowed on this route.
 
+    Also raised with code API_KEY_CONFLICT when one request carries two
+    different keys, one in Authorization and one in X-Spavik-Api-Key (for
+    instance a default header on a supplied httpx client).
+
     A missing key is refused locally, before any request is sent.
     """
 

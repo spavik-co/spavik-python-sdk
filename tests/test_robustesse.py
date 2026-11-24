@@ -200,7 +200,7 @@ async def test_sans_cle_refus_local_sauf_routes_publiques(monkeypatch):
     assert appels == []
     assert client.engine_families() == [{"id": "presage"}]
     assert client.engines() == [{"id": "presage"}]
-    assert all("X-Spavik-Api-Key" not in a.headers for a in appels)
+    assert all("Authorization" not in a.headers and "X-Spavik-Api-Key" not in a.headers for a in appels)
 
     aclient = AsyncSpavik("", client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
     with pytest.raises(SpavikAuthError, match="no API key"):

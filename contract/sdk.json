@@ -69,6 +69,7 @@
   "ERROR_FAMILY_BY_CODE": {
     "ACCOUNT_NOT_FOUND": "not_found",
     "ADMIN_KEY_CANNOT_PREDICT": "auth",
+    "API_KEY_CONFLICT": "auth",
     "API_KEY_EXPIRED": "auth",
     "API_KEY_INVALID": "auth",
     "AUTH_REQUIRED": "auth",

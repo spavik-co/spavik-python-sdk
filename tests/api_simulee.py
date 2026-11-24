@@ -38,8 +38,8 @@ class ApiSimulee:
         self.appels.append(requete)
         chemin = requete.url.path
 
-        presentee = requete.headers.get("X-Spavik-Api-Key")
-        if presentee != CLE:
+        presentee = requete.headers.get("Authorization")
+        if presentee != f"Bearer {CLE}" or "X-Spavik-Api-Key" in requete.headers:
             return self._json(401, {"status": "error", "message": "API_KEY_INVALID",
                                     "messageDetail": "API key is invalid or revoked."})
 

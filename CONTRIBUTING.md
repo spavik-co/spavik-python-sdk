@@ -53,7 +53,9 @@ See [RELEASING.md](RELEASING.md) for promotion from `dev` and package publicatio
 
 ## HTTP identity
 
-Requests authenticate with `X-Spavik-Api-Key`. `X-Spavik-Client-Name` is
+Requests authenticate with `Authorization: Bearer <key>`, and only with it:
+the SDK never sends `X-Spavik-Api-Key`, so a request cannot carry two keys
+(`API_KEY_CONFLICT`). `X-Spavik-Client-Name` is
 `spavik-sdk-python`, and `X-Spavik-Client-Version` is the installed SDK version.
 The application can customize its User-Agent with `Spavik(user_agent="my-agent/1.0")`;
 this does not change the SDK identity headers. Without that option, the

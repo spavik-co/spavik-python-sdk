@@ -70,7 +70,12 @@ class Requete:
     def entetes(self, cle_api: str, user_agent: Optional[str] = None) -> Dict[str, str]:
         from . import __version__
 
-        # Les cles API passent exclusivement en X-Spavik-Api-Key ; Bearer est reserve aux JWT.
+        # La cle part en Authorization: Bearer, la forme que l'API documente en
+        # premier, et nulle part ailleurs : X-Spavik-Api-Key n'est plus envoye,
+        # pour qu'une requete ne porte jamais deux cles (API_KEY_CONFLICT).
+        # Sur un client httpx fourni, cet Authorization remplace le sien ; un
+        # X-Spavik-Api-Key qu'il porterait part tel quel, et l'API refuse une
+        # cle differente en 400 API_KEY_CONFLICT (SpavikAuthError).
         e = {
             "Accept": "application/json",
             "User-Agent": user_agent or _agent(),
@@ -78,7 +83,7 @@ class Requete:
             "X-Spavik-Client-Version": __version__,
         }
         if cle_api:
-            e["X-Spavik-Api-Key"] = cle_api
+            e["Authorization"] = f"Bearer {cle_api}"
         if self.corps is not None:
             e["Content-Type"] = "application/json"
         if self.idempotence:

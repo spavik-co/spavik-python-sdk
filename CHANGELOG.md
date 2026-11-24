@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.3
+
+- The API key is sent as `Authorization: Bearer <key>`, the form the API now
+  documents first. `X-Spavik-Api-Key` is no longer sent, so a request carries
+  a single key. Requires the API release of 2026-11-22, which accepts Bearer
+  keys.
+- A supplied httpx client keeps its default headers, except `Authorization`,
+  which the key replaces. An `X-Spavik-Api-Key` left on it is sent as is: a
+  different key makes the API answer `400 API_KEY_CONFLICT`, raised as
+  `SpavikAuthError`.
+- `API_KEY_CONFLICT` joins the error codes, in the authentication family.
+
 ## 0.1.2
 
 - Documentation only: the README drops its production notes section and no

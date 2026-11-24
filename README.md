@@ -33,7 +33,8 @@ pip install spavik
 
 1. Create a free account on [spavik.co](https://spavik.co) and copy your API key
    from the dashboard. No credit card is required.
-2. Export it: `export SPAVIK_API_KEY="sk-spv-api-..."`
+2. Export it: `export SPAVIK_API_KEY="sk-spv-api-..."`. The client reads it
+   and sends it as `Authorization: Bearer <key>`.
 3. Download [churn.csv](https://github.com/spavik-co/spavik-python-sdk/blob/main/examples/data/churn.csv),
    120 synthetic customers with their plan, seats, support tickets and whether
    they cancelled.
